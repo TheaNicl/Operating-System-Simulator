@@ -29,6 +29,9 @@ public class PageReplacementPanel extends JPanel {
     private int simulationHits;
     private int simulationFaults;
     private boolean simulationRunning = false;
+    private int fifoPointer = 0;
+    private int[] lastUsed;
+    private String simulationAlgorithm;
 
     public PageReplacementPanel() {
         UIKit.setupModule(this);
@@ -127,11 +130,11 @@ public class PageReplacementPanel extends JPanel {
                         + references.length + " references"
         );
 
-        // Stop any previous simulation
         if (simulationTimer != null) {
             simulationTimer.stop();
         }
 
+        simulationAlgorithm = algorithm;
         simulationReferences = references;
         simulationFrames = frames;
 
@@ -140,6 +143,12 @@ public class PageReplacementPanel extends JPanel {
         simulationHits = 0;
         simulationFaults = 0;
 
+        fifoPointer = 0;
+
+        // Track the last-used time of each frame (LRU)
+        lastUsed = new int[frames];
+        Arrays.fill(lastUsed, -1);
+
         simulationRunning = true;
         runBtn.setText("Show Results");
 
@@ -147,13 +156,8 @@ public class PageReplacementPanel extends JPanel {
         hitsStat.setValue("-");
         ratioStat.setValue("-");
 
-        if (algorithm.equals("FIFO")) {
-            simulationTimer = new Timer(750, e -> {
-                executeNextStep();
-            });
-
-            simulationTimer.start();
-        }
+        simulationTimer = new Timer(750, e -> executeNextStep());
+        simulationTimer.start();
     }
 
     private void executeNextStep() {
@@ -164,36 +168,44 @@ public class PageReplacementPanel extends JPanel {
 
         int currRef = simulationReferences[simulationStep];
 
-        boolean hit = fifoStep(
-                simulationFrames,
-                simulationFrame,
-                simulationStep,
-                currRef
-        );
+        boolean hit;
 
-        // Update statistics
+        switch (simulationAlgorithm) {
+            case "FIFO":
+                hit = fifoStep(simulationFrames, simulationStep, currRef);
+                break;
+
+            case "LRU":
+                hit = lruStep(simulationFrames, simulationStep, currRef);
+                break;
+
+            case "Optimal":
+                hit = optimalStep(
+                        simulationFrames,
+                        simulationStep,
+                        currRef
+                );
+                break;
+
+            default:
+                finishSimulation();
+                return;
+        }
+
         if (hit) {
             simulationHits++;
         } else {
             simulationFaults++;
         }
 
-        // Update HIT/MISS status
         traceModel.setValueAt(
                 hit ? "HIT" : "MISS",
                 simulationFrames,
                 simulationStep + 1
         );
 
-        // Advance simulation
-        simulationFrame++;
         simulationStep++;
 
-        if (simulationFrame == simulationFrames) {
-            simulationFrame = 0;
-        }
-
-        // Finish immediately after the last step
         if (simulationStep >= simulationReferences.length) {
             finishSimulation();
         }
@@ -251,42 +263,134 @@ public class PageReplacementPanel extends JPanel {
         traceModel.setColumnIdentifiers(refRow);
     }
 
-    private int fifoPointer = 0;
-
-    private boolean fifoStep(int frames, int frame, int step, int currRef) {
-        // Check if the page already exists in a frame
-        boolean hit = false;
-
+    private boolean fifoStep(int frames, int step, int currRef) {
+        // Check for page hit
         for (int f : storedFrames) {
             if (f == currRef) {
-                hit = true;
-                break;
+                updateFrameTable(frames, step);
+                return true;
             }
         }
 
-        if (!hit) {
-            if (step < frames) {
-                // Fill empty frames first
-                storedFrames[step] = currRef;
-            } else {
-                // Replace the oldest page
-                storedFrames[fifoPointer] = currRef;
+        // Find an empty frame first
+        int emptyFrame = findEmptyFrame(frames);
 
-                // Advance FIFO pointer only on a page fault
-                fifoPointer = (fifoPointer + 1) % frames;
+        if (emptyFrame != -1) {
+            storedFrames[emptyFrame] = currRef;
+        } else {
+            // Replace the oldest page
+            storedFrames[fifoPointer] = currRef;
+            fifoPointer = (fifoPointer + 1) % frames;
+        }
+
+        updateFrameTable(frames, step);
+        return false;
+    }
+
+    private boolean lruStep(int frames, int step, int currRef) {
+        // Check for page hit
+        for (int i = 0; i < frames; i++) {
+            if (storedFrames[i] == currRef) {
+                lastUsed[i] = step;
+
+                updateFrameTable(frames, step);
+                return true;
             }
         }
 
-        // Update frame table
+        // Find an empty frame first
+        int emptyFrame = findEmptyFrame(frames);
+
+        if (emptyFrame != -1) {
+            storedFrames[emptyFrame] = currRef;
+            lastUsed[emptyFrame] = step;
+        } else {
+            // Find the least recently used frame
+            int lruFrame = 0;
+
+            for (int i = 1; i < frames; i++) {
+                if (lastUsed[i] < lastUsed[lruFrame]) {
+                    lruFrame = i;
+                }
+            }
+
+            storedFrames[lruFrame] = currRef;
+            lastUsed[lruFrame] = step;
+        }
+
+        updateFrameTable(frames, step);
+        return false;
+    }
+
+    private boolean optimalStep(int frames, int step, int currRef) {
+        // Check for page hit
+        for (int f : storedFrames) {
+            if (f == currRef) {
+                updateFrameTable(frames, step);
+                return true;
+            }
+        }
+
+        // Find an empty frame first
+        int emptyFrame = findEmptyFrame(frames);
+
+        if (emptyFrame != -1) {
+            storedFrames[emptyFrame] = currRef;
+        } else {
+            int optimalFrame = 0;
+            int farthestUse = -1;
+
+            // Find the page whose next use is farthest away
+            for (int i = 0; i < frames; i++) {
+                int nextUse = Integer.MAX_VALUE;
+
+                for (int j = step + 1; j < simulationReferences.length; j++) {
+                    if (simulationReferences[j] == storedFrames[i]) {
+                        nextUse = j;
+                        break;
+                    }
+                }
+
+                // A page that will never be used again
+                // should be replaced first
+                if (nextUse == Integer.MAX_VALUE) {
+                    optimalFrame = i;
+                    break;
+                }
+
+                if (nextUse > farthestUse) {
+                    farthestUse = nextUse;
+                    optimalFrame = i;
+                }
+            }
+
+            storedFrames[optimalFrame] = currRef;
+        }
+
+        updateFrameTable(frames, step);
+        return false;
+    }
+
+    private int findEmptyFrame(int frames) {
+        for (int i = 0; i < frames; i++) {
+            if (storedFrames[i] == -1) {
+                return i;
+            }
+        }
+
+        return -1;
+    }
+
+    private void updateFrameTable(int frames, int step) {
         for (int i = 0; i < frames; i++) {
             traceModel.setValueAt(
-                    storedFrames[i] == -1 ? "-" : String.valueOf(storedFrames[i]),
+                    storedFrames[i] == -1
+                            ? "-"
+                            : String.valueOf(storedFrames[i]),
                     i,
                     step + 1
             );
         }
-
-        return hit;
     }
 
     /** Colors the last row's Hit/Miss cells and emphasizes the row labels. */
