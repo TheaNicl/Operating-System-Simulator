@@ -93,6 +93,7 @@ public class PageReplacementPanel extends JPanel {
     }
 
     private int[] storedFrames;
+
     private void run() {
         int[] references = UIKit.parseIntList(referenceField, "Page reference string", 0, this);
         if (references == null) return;
@@ -100,6 +101,7 @@ public class PageReplacementPanel extends JPanel {
         if (frames == null) return;
 
         storedFrames = new int[frames];
+        fifoPointer = 0;
 
         setTableReferences(references);
         traceModel.setRowCount(0);
@@ -248,37 +250,42 @@ public class PageReplacementPanel extends JPanel {
         traceModel.setColumnIdentifiers(refRow);
     }
 
+    private int fifoPointer = 0;
+
     private boolean fifoStep(int frames, int frame, int step, int currRef) {
-        // Check if curr ref exists in frame
-        boolean shouldHit = false;
+        // Check whether the page already exists in memory
+        boolean hit = false;
+
         for (int f : storedFrames) {
             if (f == currRef) {
-                shouldHit = true;
+                hit = true;
                 break;
             }
         }
 
-        if (!shouldHit) storedFrames[frame] = currRef;
+        if (!hit) {
+            // Insert into the next available frame first
+            if (step < frames) {
+                storedFrames[step] = currRef;
+            } else {
+                // Replace the oldest page
+                storedFrames[fifoPointer] = currRef;
 
-        // Keep empty frames empty
-        if (step < frames) {
-            traceModel.setValueAt(currRef, frame, step + 1);
-
-            if (frame - 1 < 0) return false;
-
-            // Set previous frames also
-            for (frame = frame; frame >= 0; frame--) {
-                traceModel.setValueAt(storedFrames[frame], frame, step + 1);
+                // Advance FIFO pointer only on replacement
+                fifoPointer = (fifoPointer + 1) % frames;
             }
-
-            return false;
         }
 
-        for (frame = 0; frame < frames; frame++) {
-            traceModel.setValueAt(storedFrames[frame], frame, step + 1);
+        // Update every frame in the current column
+        for (int i = 0; i < frames; i++) {
+            traceModel.setValueAt(
+                    storedFrames[i] == 0 && i >= step + 1 ? "-" : storedFrames[i],
+                    i,
+                    step + 1
+            );
         }
 
-        return shouldHit;
+        return hit;
     }
 
     /** Colors the last row's Hit/Miss cells and emphasizes the row labels. */
