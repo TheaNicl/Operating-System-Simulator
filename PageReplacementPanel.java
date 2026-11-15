@@ -3,6 +3,9 @@ import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 import java.util.Arrays;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 public class PageReplacementPanel extends JPanel {
     private final JTextField referenceField;
@@ -72,20 +75,29 @@ public class PageReplacementPanel extends JPanel {
         return "FIFO";
     }
 
+    private int[] storedFrames;
     private void run() {
         int[] references = UIKit.parseIntList(referenceField, "Page reference string", 0, this);
         if (references == null) return;
         Integer frames = UIKit.parseInt(framesField, "Frames", 1, 20, this);
         if (frames == null) return;
 
+        storedFrames = new int[frames];
+
         setTableReferences(references);
         traceModel.setRowCount(0);
+
+        // Add empty rows
         String[] emptyRow = new String[references.length + 1];
         Arrays.fill(emptyRow, 1, emptyRow.length, "-");
         for (int i = 0; i < frames; i++) {
             emptyRow[0] = "Frame " + (i + 1);
             traceModel.addRow(emptyRow);
         }
+
+        emptyRow[0] = "Status";
+        traceModel.addRow(emptyRow);
+
         onRun(selectedAlgorithm(), references, frames);
     }
 
@@ -96,16 +108,33 @@ public class PageReplacementPanel extends JPanel {
     protected void onRun(String algorithm, int[] references, int frames) {
         traceSection.setHint(algorithm + " \u00b7 " + frames + " frames \u00b7 " + references.length + " references");
 
-//        if (algorithm.equals("FIFO")) {
-//            for (int frame = 0, step = 0; step <= references.length; frame++, step++) {
-//                int currRef = references[step];
-//                fifoStep(frame, step, currRef);
-//
-//                if (frame == frames) {
-//                    frame = -1;
-//                }
-//            }
-//        }
+        if (algorithm.equals("FIFO")) {
+            final int[] frame = {0};
+            final int[] step = {0};
+
+            Timer timer = new Timer(750, e -> {
+                if (step[0] >= references.length) {
+                    ((Timer) e.getSource()).stop();
+                    return;
+                }
+
+                int currRef = references[step[0]];
+
+                boolean hit = fifoStep(frames, frame[0], step[0], currRef);
+
+                // Set status
+                traceModel.setValueAt((hit ? "HIT" : "MISS"), frames, step[0] + 1);
+
+                frame[0]++;
+                step[0]++;
+
+                if (frame[0] == frames) {
+                    frame[0] = 0;
+                }
+            });
+
+            timer.start();
+        }
     }
 
     public void showTrace(String[] columns, Object[][] rows, int faults, int hits) {
@@ -130,10 +159,38 @@ public class PageReplacementPanel extends JPanel {
         traceModel.setColumnIdentifiers(refRow);
     }
 
-//    private void fifoStep(int frame, int step, int currRef) {
-//        System.out.println(frame + " " + step);
-//        traceModel.setValueAt(currRef, frame, step + 1);
-//    }
+    private boolean fifoStep(int frames, int frame, int step, int currRef) {
+        // Check if curr ref exists in frame
+        boolean shouldHit = false;
+        for (int f : storedFrames) {
+            if (f == currRef) {
+                shouldHit = true;
+                break;
+            }
+        }
+
+        if (!shouldHit) storedFrames[frame] = currRef;
+
+        // Keep empty frames empty
+        if (step < frames) {
+            traceModel.setValueAt(currRef, frame, step + 1);
+
+            if (frame - 1 < 0) return false;
+
+            // Set previous frames also
+            for (frame = frame; frame >= 0; frame--) {
+                traceModel.setValueAt(storedFrames[frame], frame, step + 1);
+            }
+
+            return false;
+        }
+
+        for (frame = 0; frame < frames; frame++) {
+            traceModel.setValueAt(storedFrames[frame], frame, step + 1);
+        }
+
+        return shouldHit;
+    }
 
     /** Colors the last row's Hit/Miss cells and emphasizes the row labels. */
     private static final class StatusRenderer extends DefaultTableCellRenderer {
