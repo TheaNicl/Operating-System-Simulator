@@ -166,7 +166,7 @@ public class PagingPanel extends JPanel {
         physicalStat.setValue(String.format("%,d", frame * pageSize + offset), Theme.SUCCESS);
     }
 
-    private int getBaseTwo(long num) {
+    private int getBaseTwo(double num) {
         return (int) (Math.log(num) / Math.log(2));
     }
 
@@ -189,6 +189,10 @@ public class PagingPanel extends JPanel {
 
     public String getByteFormat(double bytes) {
         StringBuilder info = new StringBuilder("<html>");
+
+        info.append("<b>Base 2:</b> 2<sup>")
+                .append(getBaseTwo(bytes))
+                .append("</sup><br>");
 
         info.append("<b>Bytes:</b> ")
                 .append(String.format("%,d", (long) bytes))
