@@ -101,6 +101,7 @@ public class PageReplacementPanel extends JPanel {
         if (frames == null) return;
 
         storedFrames = new int[frames];
+        Arrays.fill(storedFrames, -1);
         fifoPointer = 0;
 
         setTableReferences(references);
@@ -253,7 +254,7 @@ public class PageReplacementPanel extends JPanel {
     private int fifoPointer = 0;
 
     private boolean fifoStep(int frames, int frame, int step, int currRef) {
-        // Check whether the page already exists in memory
+        // Check if the page already exists in a frame
         boolean hit = false;
 
         for (int f : storedFrames) {
@@ -264,22 +265,22 @@ public class PageReplacementPanel extends JPanel {
         }
 
         if (!hit) {
-            // Insert into the next available frame first
             if (step < frames) {
+                // Fill empty frames first
                 storedFrames[step] = currRef;
             } else {
                 // Replace the oldest page
                 storedFrames[fifoPointer] = currRef;
 
-                // Advance FIFO pointer only on replacement
+                // Advance FIFO pointer only on a page fault
                 fifoPointer = (fifoPointer + 1) % frames;
             }
         }
 
-        // Update every frame in the current column
+        // Update frame table
         for (int i = 0; i < frames; i++) {
             traceModel.setValueAt(
-                    storedFrames[i] == 0 && i >= step + 1 ? "-" : storedFrames[i],
+                    storedFrames[i] == -1 ? "-" : String.valueOf(storedFrames[i]),
                     i,
                     step + 1
             );
