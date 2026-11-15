@@ -20,6 +20,15 @@ public class PageReplacementPanel extends JPanel {
     private final UIKit.Stat faultsStat = new UIKit.Stat("Page faults", "-");
     private final UIKit.Stat hitsStat = new UIKit.Stat("Page hits", "-");
     private final UIKit.Stat ratioStat = new UIKit.Stat("Hit ratio", "-");
+    private JButton runBtn;
+    private Timer simulationTimer;
+    private int[] simulationReferences;
+    private int simulationFrames;
+    private int simulationFrame;
+    private int simulationStep;
+    private int simulationHits;
+    private int simulationFaults;
+    private boolean simulationRunning = false;
 
     public PageReplacementPanel() {
         UIKit.setupModule(this);
@@ -34,8 +43,16 @@ public class PageReplacementPanel extends JPanel {
         optimalBtn = UIKit.option("Optimal", algorithmGroup);
         fifoBtn.setSelected(true);
 
-        JButton runBtn = UIKit.primary("Run");
-        runBtn.addActionListener(e -> run());
+        runBtn = UIKit.primary("Run");
+        runBtn = UIKit.primary("Run");
+
+        runBtn.addActionListener(e -> {
+            if (simulationRunning) {
+                showResults();
+            } else {
+                run();
+            }
+        });
 
         JPanel form = UIKit.form(2, "Page reference string", referenceField, "Frames", framesField);
         JPanel configBody = UIKit.transparent(new BorderLayout(0, 12));
@@ -101,51 +118,113 @@ public class PageReplacementPanel extends JPanel {
         onRun(selectedAlgorithm(), references, frames);
     }
 
-    /**
-     * Hook for the replacement logic. Compute the trace (one column per reference,
-     * one row per frame plus a final "Status" row) and pass it to {@link #showTrace}.
-     */
     protected void onRun(String algorithm, int[] references, int frames) {
-        traceSection.setHint(algorithm + " \u00b7 " + frames + " frames \u00b7 " + references.length + " references");
-        int[] hits = {0};
-        int[] faults = {0};
+        traceSection.setHint(
+                algorithm + " · " + frames + " frames · "
+                        + references.length + " references"
+        );
+
+        // Stop any previous simulation
+        if (simulationTimer != null) {
+            simulationTimer.stop();
+        }
+
+        simulationReferences = references;
+        simulationFrames = frames;
+
+        simulationFrame = 0;
+        simulationStep = 0;
+        simulationHits = 0;
+        simulationFaults = 0;
+
+        simulationRunning = true;
+        runBtn.setText("Show Results");
+
+        faultsStat.setValue("-");
+        hitsStat.setValue("-");
+        ratioStat.setValue("-");
 
         if (algorithm.equals("FIFO")) {
-            final int[] frame = {0};
-            final int[] step = {0};
-
-            Timer timer = new Timer(750, e -> {
-                if (step[0] >= references.length) {
-                    ((Timer) e.getSource()).stop();
-
-                    // Show stats after calculation
-                    showTrace(hits[0], faults[0]);
-
-                    return;
-                }
-
-                int currRef = references[step[0]];
-
-                boolean hit = fifoStep(frames, frame[0], step[0], currRef);
-
-                // Set status
-                if (hit) hits[0]++;
-                else     faults[0]++;
-                traceModel.setValueAt((hit ? "HIT" : "MISS"), frames, step[0] + 1);
-
-                frame[0]++;
-                step[0]++;
-
-                if (frame[0] == frames) {
-                    frame[0] = 0;
-                }
+            simulationTimer = new Timer(750, e -> {
+                executeNextStep();
             });
 
-            faultsStat.setValue("-");
-            hitsStat.setValue("-");
-            ratioStat.setValue("-");
-            timer.start();
+            simulationTimer.start();
         }
+    }
+
+    private void executeNextStep() {
+        if (simulationStep >= simulationReferences.length) {
+            finishSimulation();
+            return;
+        }
+
+        int currRef = simulationReferences[simulationStep];
+
+        boolean hit = fifoStep(
+                simulationFrames,
+                simulationFrame,
+                simulationStep,
+                currRef
+        );
+
+        // Update statistics
+        if (hit) {
+            simulationHits++;
+        } else {
+            simulationFaults++;
+        }
+
+        // Update HIT/MISS status
+        traceModel.setValueAt(
+                hit ? "HIT" : "MISS",
+                simulationFrames,
+                simulationStep + 1
+        );
+
+        // Advance simulation
+        simulationFrame++;
+        simulationStep++;
+
+        if (simulationFrame == simulationFrames) {
+            simulationFrame = 0;
+        }
+
+        // Finish immediately after the last step
+        if (simulationStep >= simulationReferences.length) {
+            finishSimulation();
+        }
+    }
+
+    private void showResults() {
+        if (!simulationRunning) return;
+
+        // Stop the 750ms timer
+        if (simulationTimer != null) {
+            simulationTimer.stop();
+        }
+
+        // Execute all remaining steps immediately
+        while (simulationStep < simulationReferences.length) {
+            executeNextStep();
+        }
+
+        finishSimulation();
+    }
+
+    private void finishSimulation() {
+        if (!simulationRunning) return;
+
+        if (simulationTimer != null) {
+            simulationTimer.stop();
+        }
+
+        // Display final statistics
+        showTrace(simulationFaults, simulationHits);
+
+        // Reset button state
+        simulationRunning = false;
+        runBtn.setText("Run");
     }
 
     public void showTrace(int faults, int hits) {
