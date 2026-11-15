@@ -105,8 +105,15 @@ public class PagingPanel extends JPanel {
 
         long page = address / pageSize;
         long offset = address % pageSize;
-        pagesStat.setValue(String.format("%,d", logical / pageSize));
-        framesStat.setValue(String.format("%,d", physical / pageSize));
+
+        // Calculate page sizes
+        long pages = logical / pageSize;
+        long frames = physical / pageSize;
+
+        // Set value of stats
+        pagesStat.setValue(formatBytes(pages));
+        framesStat.setValue(formatBytes(frames));
+
         pageOffsetStat.setValue(page + " / " + offset);
 
         if (page >= tableModel.getRowCount()) {
@@ -116,5 +123,22 @@ public class PagingPanel extends JPanel {
         long frame = UIKit.intAt(tableModel, (int) page, 1);
         pageTable.changeSelection((int) page, 1, false, false);
         physicalStat.setValue(String.format("%,d", frame * pageSize + offset), Theme.SUCCESS);
+    }
+
+    private int getBaseTwo(long num) {
+        return (int) (Math.log(num) / Math.log(2));
+    }
+
+    public static String formatBytes(double bytes) {
+        String[] units = {"B", "KB", "MB",
+                "GB", "TB"};
+
+        int unitIndex = 0;
+        while (bytes >= 1024 && unitIndex < units.length - 1) {
+            bytes /= 1024;
+            unitIndex++;
+        }
+
+        return String.format("%d %s", (int) bytes, units[unitIndex]);
     }
 }
