@@ -32,6 +32,8 @@ public class PageReplacementPanel extends JPanel {
     private int fifoPointer = 0;
     private int[] lastUsed;
     private String simulationAlgorithm;
+    private int highlightedStep = -1;
+    private int highlightedFrame = -1;
 
     public PageReplacementPanel() {
         UIKit.setupModule(this);
@@ -125,6 +127,10 @@ public class PageReplacementPanel extends JPanel {
     }
 
     protected void onRun(String algorithm, int[] references, int frames) {
+        highlightedStep = -1;
+        highlightedFrame = -1;
+        traceTable.repaint();
+
         traceSection.setHint(
                 algorithm + " · " + frames + " frames · "
                         + references.length + " references"
@@ -169,6 +175,7 @@ public class PageReplacementPanel extends JPanel {
         int currRef = simulationReferences[simulationStep];
 
         boolean hit;
+        int[] previousFrames = storedFrames.clone();
 
         switch (simulationAlgorithm) {
             case "FIFO":
@@ -203,6 +210,22 @@ public class PageReplacementPanel extends JPanel {
                 simulationFrames,
                 simulationStep + 1
         );
+
+        // Detect the actual replaced frame
+        highlightedFrame = -1;
+
+        if (!hit) {
+            for (int i = 0; i < simulationFrames; i++) {
+                if (previousFrames[i] != storedFrames[i]) {
+                    highlightedFrame = i;
+                    break;
+                }
+            }
+        }
+
+        highlightedStep = simulationStep;
+
+        traceTable.repaint();
 
         simulationStep++;
 
@@ -394,26 +417,56 @@ public class PageReplacementPanel extends JPanel {
     }
 
     /** Colors the last row's Hit/Miss cells and emphasizes the row labels. */
-    private static final class StatusRenderer extends DefaultTableCellRenderer {
+    private final class StatusRenderer extends DefaultTableCellRenderer {
+
         StatusRenderer() {
             setHorizontalAlignment(SwingConstants.CENTER);
         }
 
         @Override
-        public Component getTableCellRendererComponent(JTable table, Object value, boolean selected,
-                                                       boolean focused, int row, int column) {
-            super.getTableCellRendererComponent(table, value, selected, focused, row, column);
+        public Component getTableCellRendererComponent(
+                JTable table,
+                Object value,
+                boolean selected,
+                boolean focused,
+                int row,
+                int column
+        ) {
+            super.getTableCellRendererComponent(
+                    table, value, selected, focused, row, column
+            );
+
             String text = value == null ? "" : value.toString();
-            setFont(table.getFont().deriveFont(column == 0 ? Font.BOLD : Font.PLAIN));
-            if ("Hit".equalsIgnoreCase(text)) {
+
+            setFont(table.getFont().deriveFont(
+                    column == 0 ? Font.BOLD : Font.PLAIN
+            ));
+
+            setForeground(table.getForeground());
+            setBackground(table.getBackground());
+
+            // Highlight only the actual replaced/inserted frame
+            if (column == highlightedStep + 1
+                    && row == highlightedFrame
+                    && highlightedFrame != -1) {
+
+                setBackground(new Color(34, 197, 94));
+                setForeground(Color.WHITE);
+                setFont(getFont().deriveFont(Font.BOLD));
+            }
+
+            // Preserve HIT/MISS text colors
+            if ("HIT".equalsIgnoreCase(text)) {
                 setForeground(Theme.SUCCESS);
                 setFont(getFont().deriveFont(Font.BOLD));
-            } else if ("Miss".equalsIgnoreCase(text) || "Fault".equalsIgnoreCase(text)) {
+
+            } else if ("MISS".equalsIgnoreCase(text)
+                    || "FAULT".equalsIgnoreCase(text)) {
+
                 setForeground(Theme.DANGER);
                 setFont(getFont().deriveFont(Font.BOLD));
-            } else {
-                setForeground(table.getForeground());
             }
+
             return this;
         }
     }
