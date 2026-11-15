@@ -1,6 +1,10 @@
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.awt.Color;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
+import javax.swing.JButton;
 
 public class PagingPanel extends JPanel {
     private final JTextField logicalSizeField;
@@ -9,6 +13,8 @@ public class PagingPanel extends JPanel {
     private final JTextField addressField;
     private final DefaultTableModel tableModel;
     private final JTable pageTable;
+    private final JPopupMenu pagesPopup = new JPopupMenu();
+    private final JLabel pagesInfo = new JLabel();
 
     private final UIKit.Stat pagesStat = new UIKit.Stat("Pages (logical)", "—");
     private final UIKit.Stat framesStat = new UIKit.Stat("Frames (physical)", "—");
@@ -63,6 +69,22 @@ public class PagingPanel extends JPanel {
 
         JPanel statsGrid = UIKit.transparent(new GridLayout(2, 2, 10, 10));
         statsGrid.add(pagesStat);
+
+        pagesInfo.setBorder(BorderFactory.createEmptyBorder(8, 10, 8, 10));
+        pagesPopup.add(pagesInfo);
+
+        pagesStat.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                pagesPopup.show(pagesStat, 30, pagesStat.getHeight());
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                pagesPopup.setVisible(false);
+            }
+        });
+
         statsGrid.add(framesStat);
         statsGrid.add(pageOffsetStat);
         statsGrid.add(physicalStat);
@@ -114,6 +136,8 @@ public class PagingPanel extends JPanel {
         pagesStat.setValue(formatBytes(pages));
         framesStat.setValue(formatBytes(frames));
 
+        pagesInfo.setText(getByteFormat(pages));
+
         pageOffsetStat.setValue(page + " / " + offset);
 
         if (page >= tableModel.getRowCount()) {
@@ -139,6 +163,43 @@ public class PagingPanel extends JPanel {
             unitIndex++;
         }
 
-        return String.format("%d %s", (int) bytes, units[unitIndex]);
+        String formatted = (bytes % 1 == 0)
+                ? String.format("%,.0f", bytes)
+                : String.format("%,.2f", bytes);
+
+        return formatted + " " + units[unitIndex];
+    }
+
+    public String getByteFormat(double bytes) {
+        StringBuilder info = new StringBuilder("<html>");
+
+        info.append("<b>Bytes:</b> ")
+                .append(String.format("%,d", (long) bytes))
+                .append(" B<br>");
+
+        String[] units = {"Kilobytes", "Megabytes", "Gigabytes", "Terabytes"};
+        String[] abbreviations = {"KB", "MB", "GB", "TB"};
+
+        for (int i = 1; i <= 4; i++) {
+            double value = bytes / Math.pow(1024, i);
+
+            if (value >= 0.01) {
+                String formatted = (value % 1 == 0)
+                        ? String.format("%,.0f", value)
+                        : String.format("%,.2f", value);
+
+                info.append("<b>")
+                        .append(units[i - 1])
+                        .append(":</b> ")
+                        .append(formatted)
+                        .append(" ")
+                        .append(abbreviations[i - 1])
+                        .append("<br>");
+            }
+        }
+
+        info.append("</html>");
+
+        return info.toString();
     }
 }
