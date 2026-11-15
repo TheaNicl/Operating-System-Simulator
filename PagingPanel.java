@@ -15,6 +15,8 @@ public class PagingPanel extends JPanel {
     private final JTable pageTable;
     private final JPopupMenu pagesPopup = new JPopupMenu();
     private final JLabel pagesInfo = new JLabel();
+    private final JPopupMenu framesPopup = new JPopupMenu();
+    private final JLabel framesInfo = new JLabel();
 
     private final UIKit.Stat pagesStat = new UIKit.Stat("Pages (logical)", "—");
     private final UIKit.Stat framesStat = new UIKit.Stat("Frames (physical)", "—");
@@ -69,9 +71,12 @@ public class PagingPanel extends JPanel {
 
         JPanel statsGrid = UIKit.transparent(new GridLayout(2, 2, 10, 10));
         statsGrid.add(pagesStat);
+        statsGrid.add(framesStat);
 
         pagesInfo.setBorder(BorderFactory.createEmptyBorder(8, 10, 8, 10));
         pagesPopup.add(pagesInfo);
+        framesInfo.setBorder(BorderFactory.createEmptyBorder(8, 10, 8, 10));
+        framesPopup.add(framesInfo);
 
         pagesStat.addMouseListener(new MouseAdapter() {
             @Override
@@ -85,7 +90,18 @@ public class PagingPanel extends JPanel {
             }
         });
 
-        statsGrid.add(framesStat);
+        framesStat.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                framesPopup.show(framesStat, 30, framesStat.getHeight());
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                framesPopup.setVisible(false);
+            }
+        });
+
         statsGrid.add(pageOffsetStat);
         statsGrid.add(physicalStat);
         JPanel translationBody = UIKit.transparent(new BorderLayout());
@@ -137,6 +153,7 @@ public class PagingPanel extends JPanel {
         framesStat.setValue(formatBytes(frames));
 
         pagesInfo.setText(getByteFormat(pages));
+        framesInfo.setText(getByteFormat(frames));
 
         pageOffsetStat.setValue(page + " / " + offset);
 
