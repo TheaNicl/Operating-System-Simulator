@@ -17,9 +17,9 @@ public class PageReplacementPanel extends JPanel {
     private DefaultTableModel traceModel;
     private JTable traceTable;
     private final UIKit.Section traceSection;
-    private final UIKit.Stat faultsStat = new UIKit.Stat("Page faults", "6");
-    private final UIKit.Stat hitsStat = new UIKit.Stat("Page hits", "1");
-    private final UIKit.Stat ratioStat = new UIKit.Stat("Hit ratio", "14.3%");
+    private final UIKit.Stat faultsStat = new UIKit.Stat("Page faults", "-");
+    private final UIKit.Stat hitsStat = new UIKit.Stat("Page hits", "-");
+    private final UIKit.Stat ratioStat = new UIKit.Stat("Hit ratio", "-");
 
     public PageReplacementPanel() {
         UIKit.setupModule(this);
@@ -107,6 +107,8 @@ public class PageReplacementPanel extends JPanel {
      */
     protected void onRun(String algorithm, int[] references, int frames) {
         traceSection.setHint(algorithm + " \u00b7 " + frames + " frames \u00b7 " + references.length + " references");
+        int[] hits = {0};
+        int[] faults = {0};
 
         if (algorithm.equals("FIFO")) {
             final int[] frame = {0};
@@ -115,6 +117,10 @@ public class PageReplacementPanel extends JPanel {
             Timer timer = new Timer(750, e -> {
                 if (step[0] >= references.length) {
                     ((Timer) e.getSource()).stop();
+
+                    // Show stats after calculation
+                    showTrace(hits[0], faults[0]);
+
                     return;
                 }
 
@@ -123,6 +129,8 @@ public class PageReplacementPanel extends JPanel {
                 boolean hit = fifoStep(frames, frame[0], step[0], currRef);
 
                 // Set status
+                if (hit) hits[0]++;
+                else     faults[0]++;
                 traceModel.setValueAt((hit ? "HIT" : "MISS"), frames, step[0] + 1);
 
                 frame[0]++;
@@ -133,12 +141,14 @@ public class PageReplacementPanel extends JPanel {
                 }
             });
 
+            faultsStat.setValue("-");
+            hitsStat.setValue("-");
+            ratioStat.setValue("-");
             timer.start();
         }
     }
 
-    public void showTrace(String[] columns, Object[][] rows, int faults, int hits) {
-        traceModel.setDataVector(rows, columns);
+    public void showTrace(int faults, int hits) {
         int total = faults + hits;
         faultsStat.setValue(String.valueOf(faults));
         hitsStat.setValue(String.valueOf(hits));
