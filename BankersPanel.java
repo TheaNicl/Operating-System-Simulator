@@ -147,18 +147,15 @@ public class BankersPanel extends JPanel {
         Integer c = UIKit.parseInt(availCField, "Available C", 0, 100000, this);
         if (c == null) return;
 
-        // Read the matrices and derive Need = Max - Allocation.
         int n = allocModel.getRowCount();
         int m = RESOURCES.length;
         int[][] alloc = new int[n][m];
         int[][] maxDemand = new int[n][m];
-        int[][] need = new int[n][m];
         for (int i = 0; i < n; i++) {
             for (int j = 0; j < m; j++) {
                 alloc[i][j] = UIKit.intAt(allocModel, i, j + 1);
                 maxDemand[i][j] = UIKit.intAt(maxModel, i, j + 1);
-                need[i][j] = maxDemand[i][j] - alloc[i][j];
-                if (need[i][j] < 0) {
+                if (maxDemand[i][j] < alloc[i][j]) {
                     maxTable.changeSelection(i, j + 1, false, false);
                     UIKit.error(this, allocModel.getValueAt(i, 0) + " is allocated more " + RESOURCES[j]
                             + " than its maximum demand.");
@@ -166,29 +163,27 @@ public class BankersPanel extends JPanel {
                 }
             }
         }
+        onCalculate(new int[]{a, b, c}, alloc, maxDemand);
+    }
 
-        // Safety algorithm. workAtRun[i] stays null for processes that cannot finish.
-        int[] work = {a, b, c};
-        int[][] workAtRun = new int[n][];
-        boolean[] finished = new boolean[n];
-        List<String> sequence = new ArrayList<>();
-        boolean progressed = true;
-        while (sequence.size() < n && progressed) {
-            progressed = false;
-            for (int i = 0; i < n; i++) {
-                if (!finished[i] && fits(need[i], work)) {
-                    workAtRun[i] = work.clone();
-                    for (int j = 0; j < m; j++) {
-                        work[j] += alloc[i][j];
-                    }
-                    finished[i] = true;
-                    sequence.add(allocModel.getValueAt(i, 0).toString());
-                    progressed = true;
-                }
-            }
-        }
+    /**
+     * BACK-END HOOK. Run the safety algorithm on the validated inputs, then call
+     * {@link #showResult}. Rows of {@code alloc} / {@code maxDemand} follow the table row order.
+     */
+    protected void onCalculate(int[] available, int[][] alloc, int[][] maxDemand) {
+    }
 
-        // Fill the output table: process | allocation | max | need | work
+    /**
+     * Displays a computed result.
+     *
+     * @param need        Need matrix (Max - Allocation), one row per process
+     * @param workAtRun   Work vector at the moment each process runs; a null row means it never finished
+     * @param safeSequence process names in safe order, or null when the state is unsafe
+     */
+    public void showResult(int[][] alloc, int[][] maxDemand, int[][] need, int[][] workAtRun,
+                           List<String> safeSequence) {
+        int n = allocModel.getRowCount();
+        int m = RESOURCES.length;
         outputModel.setRowCount(0);
         for (int i = 0; i < n; i++) {
             Object[] outputRow = new Object[1 + 4 * m];
@@ -197,27 +192,16 @@ public class BankersPanel extends JPanel {
                 outputRow[1 + j] = String.valueOf(alloc[i][j]);
                 outputRow[1 + m + j] = String.valueOf(maxDemand[i][j]);
                 outputRow[1 + 2 * m + j] = String.valueOf(need[i][j]);
-                outputRow[1 + 3 * m + j] = workAtRun[i] == null ? "—" : String.valueOf(workAtRun[i][j]);
+                outputRow[1 + 3 * m + j] = workAtRun[i] == null ? "\u2014" : String.valueOf(workAtRun[i][j]);
             }
             outputModel.addRow(outputRow);
         }
-
-        if (sequence.size() == n) {
-            safeSequenceLabel.setText("SAFE SEQUENCE:  " + String.join("  \u2192  ", sequence));
+        if (safeSequence != null) {
+            safeSequenceLabel.setText("SAFE SEQUENCE:  " + String.join("  \u2192  ", safeSequence));
             safeSequenceLabel.setForeground(Theme.SUCCESS);
         } else {
             safeSequenceLabel.setText("Unsafe state: no sequence lets every process finish.");
             safeSequenceLabel.setForeground(Theme.DANGER);
         }
-    }
-
-    /** True when every resource in {@code need} is available in {@code work}. */
-    private static boolean fits(int[] need, int[] work) {
-        for (int j = 0; j < need.length; j++) {
-            if (need[j] > work[j]) {
-                return false;
-            }
-        }
-        return true;
     }
 }

@@ -118,18 +118,33 @@ public class PagingPanel extends JPanel {
             return;
         }
 
-        long page = address / pageSize;
-        long offset = address % pageSize;
-        pagesStat.setValue(String.format("%,d", logical / pageSize));
-        framesStat.setValue(String.format("%,d", physical / pageSize));
-        pageOffsetStat.setValue(page + " / " + offset);
+        onTranslate(logical, physical, pageSize, address, tableModel);
+    }
 
-        if (page >= tableModel.getRowCount()) {
+    /**
+     * BACK-END HOOK. Compute page count, frame count, page / offset and the physical address
+     * (page table is {@code pageTableModel}, column 1 = frame), then call {@link #showResult}.
+     */
+    protected void onTranslate(long logicalBytes, long physicalBytes, long pageSizeBytes, long address,
+                               DefaultTableModel pageTableModel) {
+    }
+
+    /**
+     * Displays a computed translation.
+     *
+     * @param physicalAddress the translated address, or null to show a page fault
+     */
+    public void showResult(long pages, long frames, long page, long offset, Long physicalAddress) {
+        pagesStat.setValue(String.format("%,d", pages));
+        framesStat.setValue(String.format("%,d", frames));
+        pageOffsetStat.setValue(page + " / " + offset);
+        if (physicalAddress == null) {
             physicalStat.setValue("Page fault", Theme.DANGER);
             return;
         }
-        long frame = UIKit.intAt(tableModel, (int) page, 1);
-        pageTable.changeSelection((int) page, 1, false, false);
-        physicalStat.setValue(String.format("%,d", frame * pageSize + offset), Theme.SUCCESS);
+        if (page < pageTable.getRowCount()) {
+            pageTable.changeSelection((int) page, 1, false, false);
+        }
+        physicalStat.setValue(String.format("%,d", physicalAddress), Theme.SUCCESS);
     }
 }

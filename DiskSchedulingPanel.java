@@ -129,12 +129,6 @@ public class DiskSchedulingPanel extends JPanel {
      */
     protected int[] computeServiceOrder(String algorithm, int head, int[] requests, int diskSize,
                                         boolean towardHigher) {
-        if ("FCFS".equals(algorithm)) {
-            int[] order = new int[requests.length + 1];
-            order[0] = head;
-            System.arraycopy(requests, 0, order, 1, requests.length);
-            return order;
-        }
         return null;
     }
 

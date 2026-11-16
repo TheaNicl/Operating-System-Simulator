@@ -18,12 +18,15 @@ import java.util.List;
 public class CPUSchedulingPanel extends JPanel {
     // Column layout of the process table: inputs first, computed results after.
     private static final String[] COLUMNS = {"Process", "Arrival Time", "Burst Time", "Priority",
-            "Completion Time", "Turnaround Time", "Waiting Time", "Response Time"};
+            "Completion Time", "Turnaround Time", "Waiting Time", "Response Time", "Avg. Time Calculations"};
     private static final int COL_ARRIVAL = 1;
     private static final int COL_BURST = 2;
     private static final int COL_PRIORITY = 3;
     private static final int COL_COMPLETION = 4;
+    private static final int COL_AVERAGES = 8;   // merged "Avg. Time Calculations" column (no model data)
     private static final int INPUT_COLUMNS = 4;
+    private static final int ROW_HEIGHT = 36;
+    private static final int MAX_VISIBLE_ROWS = 8;
     private static final String NO_RESULT = "";
 
     private final DecimalFormat averageFormat = new DecimalFormat("0.##");
@@ -42,16 +45,14 @@ public class CPUSchedulingPanel extends JPanel {
     private final JToggleButton rrBtn;
     private final JCheckBox preemptiveBox = new JCheckBox("Preemptive");
 
-    // Result widgets
+    // Result widgets: the whole result lives in one card, like the design (table + averages + Gantt)
     private final UIKit.Section resultsSection;
-    private final UIKit.Stat avgWaitingStat = new UIKit.Stat("Avg. waiting time", "—");
-    private final UIKit.Stat avgTurnaroundStat = new UIKit.Stat("Avg. turnaround time", "—");
-    private final JLabel waitingFormula = UIKit.muted(" ");
-    private final JLabel turnaroundFormula = UIKit.muted(" ");
+    private String waitingText = "";      // "Average Waiting Time = (7+3+0+0)/4 = 2.5"
+    private String turnaroundText = "";
+    private JScrollPane tableScroll;
     private final GanttChart ganttChart = new GanttChart();
     private final JPanel ganttArea = UIKit.transparent(new BorderLayout());
-    private final JComponent emptyGantt = UIKit.emptyState("No schedule yet",
-            "Pick an algorithm below and press Run to see the Gantt chart and timing results.");
+    private final JComponent emptyGantt = UIKit.muted("Press Run to see the Gantt chart.");
 
     /** True while the panel itself writes result cells, so those writes don't clear the results. */
     private boolean writingResults;
@@ -82,34 +83,44 @@ public class CPUSchedulingPanel extends JPanel {
         removeBtn.addActionListener(e -> {
             UIKit.removeSelectedRows(processTable);
             clearResults();
+            resizeTable();
         });
 
-        JPanel processBody = UIKit.transparent(new BorderLayout(0, 10));
-        processBody.add(UIKit.scroll(processTable), BorderLayout.CENTER);
-        processBody.add(UIKit.row(addBtn, removeBtn), BorderLayout.SOUTH);
-        UIKit.Section processSection = new UIKit.Section("Processes",
-                "Double-click a cell to edit · results fill in after Run", processBody);
+        // Grid look of the design: full cell borders, taller rows. Rows are separated by the cell
+        // renderers (not by the table) so the averages column can merge cells across rows.
+        processTable.setRowHeight(ROW_HEIGHT);
+        processTable.setIntercellSpacing(new Dimension(0, 0));
+        processTable.setShowHorizontalLines(false);
+        processTable.setShowVerticalLines(true);
+        processTable.setDefaultRenderer(Object.class, new GridCellRenderer());
+        processTable.getColumnModel().getColumn(COL_AVERAGES).setCellRenderer(new AverageRenderer());
+        processTable.getColumnModel().getColumn(COL_AVERAGES).setPreferredWidth(240);
 
-        // --- results: averages with their formulas, then the Gantt chart ---
-        ganttArea.add(emptyGantt);
-        JPanel formulas = UIKit.transparent(null);
-        formulas.setLayout(new BoxLayout(formulas, BoxLayout.Y_AXIS));
-        waitingFormula.setAlignmentX(Component.LEFT_ALIGNMENT);
-        turnaroundFormula.setAlignmentX(Component.LEFT_ALIGNMENT);
-        formulas.add(waitingFormula);
-        formulas.add(Box.createVerticalStrut(2));
-        formulas.add(turnaroundFormula);
+        tableScroll = UIKit.scroll(processTable);
+        resizeTable();
 
-        JPanel summary = UIKit.transparent(new BorderLayout(0, 8));
-        summary.add(UIKit.stats(avgWaitingStat, avgTurnaroundStat), BorderLayout.NORTH);
-        summary.add(formulas, BorderLayout.CENTER);
+        // --- Gantt chart attached directly under the table, with its "Gantt Chart" label cell ---
+        JLabel ganttLabel = new JLabel("Gantt Chart", SwingConstants.CENTER);
+        ganttLabel.setBorder(new UIKit.RoundedBorder(8, new Insets(6, 12, 6, 12)));
+        ganttArea.add(emptyGantt, BorderLayout.CENTER);
+        JPanel labelCell = UIKit.transparent(new GridBagLayout());
+        labelCell.add(ganttLabel);
+        JPanel ganttRow = UIKit.transparent(new BorderLayout(12, 0));
+        ganttRow.add(labelCell, BorderLayout.WEST);
+        ganttRow.add(ganttArea, BorderLayout.CENTER);
+        ganttRow.setPreferredSize(new Dimension(0, 90));
 
-        JPanel resultsBody = UIKit.transparent(new BorderLayout(0, 12));
-        resultsBody.add(summary, BorderLayout.NORTH);
-        resultsBody.add(ganttArea, BorderLayout.CENTER);
-        resultsSection = new UIKit.Section("Results & Gantt Chart", resultsBody);
+        // Table and Gantt chart are stacked at their natural height, so the chart touches the table.
+        JPanel tableAndGantt = UIKit.transparent(new BorderLayout(0, 12));
+        tableAndGantt.add(tableScroll, BorderLayout.NORTH);
+        tableAndGantt.add(ganttRow, BorderLayout.CENTER);
 
-        add(UIKit.split(JSplitPane.VERTICAL_SPLIT, processSection, resultsSection, 0.5), BorderLayout.CENTER);
+        JPanel body = UIKit.transparent(new BorderLayout(0, 12));
+        body.add(tableAndGantt, BorderLayout.NORTH);
+        body.add(UIKit.row(addBtn, removeBtn), BorderLayout.SOUTH);
+        resultsSection = new UIKit.Section("Processes & Results",
+                "Double-click a cell to edit · results fill in after Run", body);
+        add(resultsSection, BorderLayout.CENTER);
 
         // --- bottom bar: algorithm picker, preemption, quantum, Run ---
         fcfsBtn = UIKit.option("FCFS", algorithmGroup);
@@ -158,6 +169,7 @@ public class CPUSchedulingPanel extends JPanel {
         int last = tableModel.getRowCount() - 1;
         processTable.changeSelection(last, COL_ARRIVAL, false, false);
         clearResults();
+        resizeTable();
     }
 
     /** Quantum only applies to Round Robin; Preemptive only to SJF and Priority. */
@@ -255,12 +267,11 @@ public class CPUSchedulingPanel extends JPanel {
 
         double avgWaiting = average(waiting);
         double avgTurnaround = average(turnaround);
-        avgWaitingStat.setValue(String.format("%.2f", avgWaiting));
-        avgTurnaroundStat.setValue(String.format("%.2f", avgTurnaround));
-        waitingFormula.setText("Average Waiting Time = (" + joinSum(waiting) + ")/" + n
-                + " = " + averageFormat.format(avgWaiting));
-        turnaroundFormula.setText("Average Turnaround Time = (" + joinSum(turnaround) + ")/" + n
-                + " = " + averageFormat.format(avgTurnaround));
+        waitingText = "Average Waiting Time<br>= (" + joinSum(waiting) + ")/" + n
+                + " = " + averageFormat.format(avgWaiting);
+        turnaroundText = "Average Turnaround Time<br>= (" + joinSum(turnaround) + ")/" + n
+                + " = " + averageFormat.format(avgTurnaround);
+        processTable.repaint();
 
         ganttChart.setSchedule(gantt, names);
         JScrollPane scroll = UIKit.scroll(ganttChart);
@@ -280,22 +291,21 @@ public class CPUSchedulingPanel extends JPanel {
         writingResults = true;
         try {
             for (int row = 0; row < tableModel.getRowCount(); row++) {
-                for (int column = COL_COMPLETION; column < COLUMNS.length; column++) {
+                for (int column = COL_COMPLETION; column < COL_AVERAGES; column++) {
                     tableModel.setValueAt(NO_RESULT, row, column);
                 }
             }
         } finally {
             writingResults = false;
         }
-        avgWaitingStat.setValue("—");
-        avgTurnaroundStat.setValue("—");
-        waitingFormula.setText(" ");
-        turnaroundFormula.setText(" ");
+        waitingText = "";
+        turnaroundText = "";
+        processTable.repaint();
         ganttArea.removeAll();
         ganttArea.add(emptyGantt, BorderLayout.CENTER);
         ganttArea.revalidate();
         ganttArea.repaint();
-        resultsSection.setHint("");
+        resultsSection.setHint("Double-click a cell to edit · results fill in after Run");
     }
 
     private static double average(int[] values) {
@@ -316,6 +326,91 @@ public class CPUSchedulingPanel extends JPanel {
             text.append(values[i]);
         }
         return text.toString();
+    }
+
+    /** Sizes the table to its rows (up to MAX_VISIBLE_ROWS) so the Gantt chart sits right below it. */
+    private void resizeTable() {
+        int rows = Math.min(Math.max(tableModel.getRowCount(), 1), MAX_VISIBLE_ROWS);
+        int header = processTable.getTableHeader().getPreferredSize().height;
+        tableScroll.setPreferredSize(new Dimension(0, header + rows * ROW_HEIGHT + 6));
+        tableScroll.revalidate();
+    }
+
+    /** Normal cells: centred text with a thin line below, so the grid looks like the design. */
+    private static final class GridCellRenderer extends javax.swing.table.DefaultTableCellRenderer {
+        @Override
+        public Component getTableCellRendererComponent(JTable table, Object value, boolean selected,
+                                                       boolean focused, int row, int column) {
+            super.getTableCellRendererComponent(table, value, selected, focused, row, column);
+            setHorizontalAlignment(SwingConstants.CENTER);
+            setBorder(BorderFactory.createMatteBorder(0, 0, 1, 0, UIKit.borderColor()));
+            return this;
+        }
+    }
+
+    /**
+     * Renderer for the "Avg. Time Calculations" column. The column is split into two merged cells
+     * (first half of the rows = waiting time, second half = turnaround time), or one merged cell
+     * with both texts when there are fewer than four rows. Every row paints its own slice of the
+     * tall merged cell, so the pieces line up into one block.
+     */
+    private final class AverageRenderer extends JComponent implements javax.swing.table.TableCellRenderer {
+        private final JLabel label = new JLabel();
+        private int row;
+        private int rows;
+        private Color background = Color.WHITE;
+        private Color foreground = Color.BLACK;
+
+        AverageRenderer() {
+            label.setVerticalAlignment(SwingConstants.CENTER);
+            label.setBorder(BorderFactory.createEmptyBorder(4, 12, 4, 12));
+        }
+
+        @Override
+        public Component getTableCellRendererComponent(JTable table, Object value, boolean selected,
+                                                       boolean focused, int row, int column) {
+            this.row = row;
+            this.rows = table.getRowCount();
+            Color bg = table.getBackground();
+            background = bg != null ? bg : Color.WHITE;
+            foreground = UIKit.textColor(); // the table itself can report a stale colour after a theme switch
+            label.setFont(table.getFont());
+            return this;
+        }
+
+        @Override
+        protected void paintComponent(Graphics g) {
+            int width = getWidth();
+            int height = getHeight();
+            boolean split = rows >= 4;
+            int middle = (rows + 1) / 2;
+            int blockStart = !split || row < middle ? 0 : middle;
+            int blockEnd = !split ? rows : (row < middle ? middle : rows);
+            String text;
+            if (waitingText.isEmpty()) {
+                text = "";
+            } else if (!split) {
+                text = waitingText + "<br><br>" + turnaroundText;
+            } else {
+                text = row < middle ? waitingText : turnaroundText;
+            }
+
+            Graphics2D g2 = (Graphics2D) g.create();
+            g2.setColor(background);
+            g2.fillRect(0, 0, width, height);
+            if (row == blockEnd - 1) {
+                g2.setColor(UIKit.borderColor());
+                g2.fillRect(0, height - 1, width, 1);
+            }
+            // Paint the tall label shifted up by the rows above this one in the block.
+            g2.clipRect(0, 0, width, height);
+            g2.translate(0, -(row - blockStart) * height);
+            label.setForeground(foreground);
+            label.setText("<html>" + text + "</html>");
+            label.setSize(width, (blockEnd - blockStart) * height);
+            label.paint(g2);
+            g2.dispose();
+        }
     }
 
     /** Process table model (inputs and results), for tests or other modules. */
