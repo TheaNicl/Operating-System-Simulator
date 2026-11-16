@@ -2,19 +2,29 @@ import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 
+/**
+ * Module 3: Paging.
+ * 
+ * The user enters memory sizes, page size and a logical address plus a page table; the panel
+ * splits the address into page number and offset and maps it to a physical address.
+ */
 public class PagingPanel extends JPanel {
+    // Inputs: memory sizes, page size and the logical address to translate.
     private final JTextField logicalSizeField;
     private final JTextField physicalSizeField;
     private final JTextField pageSizeField;
     private final JTextField addressField;
+    // Editable page table (page number -> frame number).
     private final DefaultTableModel tableModel;
     private final JTable pageTable;
 
+    // Result tiles: page count, frame count, page/offset split and the physical address.
     private final UIKit.Stat pagesStat = new UIKit.Stat("Pages (logical)", "—");
     private final UIKit.Stat framesStat = new UIKit.Stat("Frames (physical)", "—");
     private final UIKit.Stat pageOffsetStat = new UIKit.Stat("Page / Offset", "—");
     private final UIKit.Stat physicalStat = new UIKit.Stat("Physical address", "—");
 
+    /** Builds the configuration form, page table and translation result tiles. */
     public PagingPanel() {
         UIKit.setupModule(this);
         add(UIKit.header("Paging",
@@ -77,6 +87,11 @@ public class PagingPanel extends JPanel {
         add(center, BorderLayout.CENTER);
     }
 
+    /**
+     * Validates all inputs, then computes the translation:
+     * page = address / pageSize, offset = address % pageSize,
+     * physical = frame * pageSize + offset. A page missing from the table is reported as a page fault.
+     */
     private void calculate() {
         Long logical = UIKit.parseSizeField(logicalSizeField, "Logical memory size", this);
         if (logical == null) return;

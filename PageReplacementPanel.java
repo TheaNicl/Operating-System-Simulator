@@ -3,13 +3,21 @@ import javax.swing.table.DefaultTableCellRenderer;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 
+/**
+ * Module 4: Page Replacement.
+ * 
+ * Shows a frame-by-frame trace (one column per reference, one row per frame, plus a Hit/Miss row)
+ * and fault/hit statistics for FIFO, LRU or Optimal.
+ */
 public class PageReplacementPanel extends JPanel {
+    // Inputs: reference string, frame count and algorithm choice.
     private final JTextField referenceField;
     private final JTextField framesField;
     private final ButtonGroup algorithmGroup = new ButtonGroup();
     private final JToggleButton fifoBtn;
     private final JToggleButton lruBtn;
     private final JToggleButton optimalBtn;
+    // Trace table and result tiles (sample data is shown until the first run).
     private final DefaultTableModel traceModel;
     private final JTable traceTable;
     private final UIKit.Section traceSection;
@@ -17,6 +25,7 @@ public class PageReplacementPanel extends JPanel {
     private final UIKit.Stat hitsStat = new UIKit.Stat("Page hits", "1");
     private final UIKit.Stat ratioStat = new UIKit.Stat("Hit ratio", "14.3%");
 
+    /** Builds the configuration card, the frame trace table and the statistics tiles. */
     public PageReplacementPanel() {
         UIKit.setupModule(this);
         add(UIKit.header("Page Replacement",
@@ -59,12 +68,14 @@ public class PageReplacementPanel extends JPanel {
         add(center, BorderLayout.CENTER);
     }
 
+    /** Name of the selected algorithm button. */
     private String selectedAlgorithm() {
         if (lruBtn.isSelected()) return "LRU";
         if (optimalBtn.isSelected()) return "Optimal";
         return "FIFO";
     }
 
+    /** Validates the reference string and frame count, then calls {@link #onRun}. */
     private void run() {
         int[] references = UIKit.parseIntList(referenceField, "Page reference string", 0, this);
         if (references == null) return;
@@ -81,6 +92,7 @@ public class PageReplacementPanel extends JPanel {
         traceSection.setHint(algorithm + " \u00b7 " + frames + " frames \u00b7 " + references.length + " references");
     }
 
+    /** Displays a computed trace and updates the fault, hit and hit-ratio tiles. */
     public void showTrace(String[] columns, Object[][] rows, int faults, int hits) {
         traceModel.setDataVector(rows, columns);
         int total = faults + hits;

@@ -6,16 +6,19 @@ import java.util.Arrays;
 
 /** Classic disk-head chart: track numbers along the top axis, one row per request, animated line. */
 public class HeadMovementChart extends JComponent {
+    // Chart margins in pixels (extra room at the top for the track-number axis).
     private static final int PAD_LEFT = 24;
     private static final int PAD_RIGHT = 24;
     private static final int PAD_TOP = 34;
     private static final int PAD_BOTTOM = 16;
 
+    // Visited tracks in order, the highest track on the axis, and animation progress (in segments).
     private int[] sequence = new int[0];
     private int maxTrack = 199;
     private float progress;
     private final Timer timer;
 
+    /** Creates an empty chart; the timer advances {@code progress} to animate the line being drawn. */
     public HeadMovementChart() {
         setOpaque(false);
         setPreferredSize(new Dimension(420, 260));
@@ -29,6 +32,7 @@ public class HeadMovementChart extends JComponent {
         });
     }
 
+    /** Shows a new head path. With {@code animate} the line is drawn progressively, otherwise at once. */
     public void setSequence(int[] newSequence, int newMaxTrack, boolean animate) {
         timer.stop();
         sequence = newSequence.clone();
@@ -42,6 +46,7 @@ public class HeadMovementChart extends JComponent {
     }
 
     @Override
+    // Paints the axis, the (partially animated) path, and a labelled dot for every visited track.
     protected void paintComponent(Graphics g) {
         Graphics2D g2 = (Graphics2D) g.create();
         g2.setRenderingHint(RenderingHints.KEY_ANTIALIASING, RenderingHints.VALUE_ANTIALIAS_ON);
@@ -108,10 +113,12 @@ public class HeadMovementChart extends JComponent {
         g2.dispose();
     }
 
+    /** Screen position of the index-th visited track: x from the track number, y from the step. */
     private Point2D point(int index, int width, float rowHeight) {
         return new Point2D.Float(xFor(sequence[index], width), PAD_TOP + 8 + index * (rowHeight - 8f / (sequence.length - 1)));
     }
 
+    /** Converts a track number into an x pixel on the axis. */
     private int xFor(int track, int width) {
         return PAD_LEFT + Math.round(width * (track / (float) maxTrack));
     }
