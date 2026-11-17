@@ -171,6 +171,7 @@ public class PagingPanel extends JPanel {
         framesInfo.setText(getByteFormat(frames));
 
         pageOffsetStat.setValue(page + " / " + offset);
+    }
 
     /**
      * Displays a computed translation.
