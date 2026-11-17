@@ -2,20 +2,12 @@ import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 
-/**
- * Module 8: Multiprogramming.
- * 
- * A job queue (arrival and burst time) on the left and a chronological system status / execution
- * log on the right.
- */
 public class MultiprogrammingPanel extends JPanel {
-    // Editable job queue and the read-only execution log.
     private final DefaultTableModel jobModel;
     private final JTable jobTable;
     private final DefaultTableModel logModel;
     private final UIKit.Section logSection;
 
-    /** Builds the job queue card (with Add/Remove/Run) and the log table with sample rows. */
     public MultiprogrammingPanel() {
         UIKit.setupModule(this);
         add(UIKit.header("Multiprogramming",
@@ -56,7 +48,6 @@ public class MultiprogrammingPanel extends JPanel {
                 new UIKit.Section("Job Queue", jobBody), logSection, 0.3), BorderLayout.CENTER);
     }
 
-    /** Validates the job queue, then calls {@link #onRun}. */
     private void run() {
         if (jobModel.getRowCount() == 0) {
             UIKit.error(this, "Add at least one job before running the simulation.");
@@ -73,12 +64,10 @@ public class MultiprogrammingPanel extends JPanel {
     protected void onRun(DefaultTableModel jobs) {
     }
 
-    /** Removes every row from the execution log. */
     public void clearLog() {
         logModel.setRowCount(0);
     }
 
-    /** Adds one row to the execution log. */
     public void appendLog(Object[] row) {
         logModel.addRow(row);
     }

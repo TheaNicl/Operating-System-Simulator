@@ -6,19 +6,11 @@ import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import javax.swing.JButton;
 
-/**
- * Module 3: Paging.
- * 
- * The user enters memory sizes, page size and a logical address plus a page table; the panel
- * splits the address into page number and offset and maps it to a physical address.
- */
 public class PagingPanel extends JPanel {
-    // Inputs: memory sizes, page size and the logical address to translate.
     private final JTextField logicalSizeField;
     private final JTextField physicalSizeField;
     private final JTextField pageSizeField;
     private final JTextField addressField;
-    // Editable page table (page number -> frame number).
     private final DefaultTableModel tableModel;
     private final JTable pageTable;
     private final JPopupMenu pagesPopup = new JPopupMenu();
@@ -26,13 +18,11 @@ public class PagingPanel extends JPanel {
     private final JPopupMenu framesPopup = new JPopupMenu();
     private final JLabel framesInfo = new JLabel();
 
-    // Result tiles: page count, frame count, page/offset split and the physical address.
     private final UIKit.Stat pagesStat = new UIKit.Stat("Pages (logical)", "—");
     private final UIKit.Stat framesStat = new UIKit.Stat("Frames (physical)", "—");
     private final UIKit.Stat pageOffsetStat = new UIKit.Stat("Page / Offset", "—");
     private final UIKit.Stat physicalStat = new UIKit.Stat("Physical address", "—");
 
-    /** Builds the configuration form, page table and translation result tiles. */
     public PagingPanel() {
         UIKit.setupModule(this);
         add(UIKit.header("Paging",
@@ -125,11 +115,6 @@ public class PagingPanel extends JPanel {
         add(center, BorderLayout.CENTER);
     }
 
-    /**
-     * Validates all inputs, then computes the translation:
-     * page = address / pageSize, offset = address % pageSize,
-     * physical = frame * pageSize + offset. A page missing from the table is reported as a page fault.
-     */
     private void calculate() {
         Long logical = UIKit.parseSizeField(logicalSizeField, "Logical memory size", this);
         if (logical == null) return;
@@ -172,23 +157,13 @@ public class PagingPanel extends JPanel {
 
         pageOffsetStat.setValue(page + " / " + offset);
 
-    /**
-     * Displays a computed translation.
-     *
-     * @param physicalAddress the translated address, or null to show a page fault
-     */
-    public void showResult(long pages, long frames, long page, long offset, Long physicalAddress) {
-        pagesStat.setValue(String.format("%,d", pages));
-        framesStat.setValue(String.format("%,d", frames));
-        pageOffsetStat.setValue(page + " / " + offset);
-        if (physicalAddress == null) {
+        if (page >= tableModel.getRowCount()) {
             physicalStat.setValue("Page fault", Theme.DANGER);
             return;
         }
-        if (page < pageTable.getRowCount()) {
-            pageTable.changeSelection((int) page, 1, false, false);
-        }
-        physicalStat.setValue(String.format("%,d", physicalAddress), Theme.SUCCESS);
+        long frame = UIKit.intAt(tableModel, (int) page, 1);
+        pageTable.changeSelection((int) page, 1, false, false);
+        physicalStat.setValue(String.format("%,d", frame * pageSize + offset), Theme.SUCCESS);
     }
 
     private int getBaseTwo(double num) {

@@ -20,18 +20,15 @@ public final class UIKit {
     private static final Pattern SIZE_PATTERN =
             Pattern.compile("^\\s*(\\d+(?:\\.\\d+)?)\\s*(B|KB|MB|GB|TB)?\\s*$", Pattern.CASE_INSENSITIVE);
 
-    // Utility class: not meant to be instantiated.
     private UIKit() {}
 
     // ---------------------------------------------------------------- layout
 
-    /** Standard module layout: BorderLayout with a 16px gap and a 20/24px outer margin. */
     public static void setupModule(JPanel panel) {
         panel.setLayout(new BorderLayout(0, 16));
         panel.setBorder(BorderFactory.createEmptyBorder(20, 24, 20, 24));
     }
 
-    /** Panel with the given layout that lets the parent background show through. */
     public static JPanel transparent(LayoutManager layout) {
         JPanel panel = new JPanel(layout);
         panel.setOpaque(false);
@@ -67,7 +64,6 @@ public final class UIKit {
         return panel;
     }
 
-    /** Borderless split pane; {@code weight} is the share of extra space given to the first component. */
     public static JSplitPane split(int orientation, Component first, Component second, double weight) {
         JSplitPane split = new JSplitPane(orientation, first, second);
         split.setResizeWeight(weight);
@@ -112,7 +108,6 @@ public final class UIKit {
 
     // ----------------------------------------------------------- typography
 
-    /** Page heading with an optional muted subtitle. */
     public static JComponent header(String title, String subtitle) {
         return header(title, subtitle, null);
     }
@@ -149,7 +144,6 @@ public final class UIKit {
         }
     }
 
-    /** Label drawn in the theme's muted (disabled) text colour, for hints and captions. */
     public static JLabel muted(String text) {
         JLabel label = new JLabel(text);
         label.putClientProperty("FlatLaf.style", "foreground: $Label.disabledForeground");
@@ -159,7 +153,6 @@ public final class UIKit {
         return label;
     }
 
-    /** Centered placeholder (title + message) shown before any results exist. */
     public static JComponent emptyState(String title, String message) {
         JLabel titleLabel = new JLabel(title, SwingConstants.CENTER);
         styleClass(titleLabel, "h4", Font.BOLD, 1.1f);
@@ -182,7 +175,6 @@ public final class UIKit {
 
     // -------------------------------------------------------------- controls
 
-    /** Blue call-to-action button (Run, Calculate, ...). */
     public static JButton primary(String text) {
         JButton button = new JButton(text);
         button.putClientProperty("FlatLaf.style",
@@ -195,7 +187,6 @@ public final class UIKit {
         return button;
     }
 
-    /** Plain button for secondary actions (Add, Remove, ...). */
     public static JButton secondary(String text) {
         return new JButton(text);
     }
@@ -208,7 +199,6 @@ public final class UIKit {
         return button;
     }
 
-    /** Text field with placeholder text; its red error outline clears as soon as the user types. */
     public static JTextField field(String text, String placeholder, int columns) {
         final JTextField field = new JTextField(text, columns);
         if (placeholder != null) {
@@ -222,14 +212,12 @@ public final class UIKit {
         return field;
     }
 
-    /** Turns the red error outline on or off (FlatLaf only; harmless on other look and feels). */
     public static void markInvalid(JComponent component, boolean invalid) {
         component.putClientProperty("JComponent.outline", invalid ? "error" : null);
     }
 
     // ---------------------------------------------------------------- tables
 
-    /** Table model where all columns are editable or none are. */
     public static DefaultTableModel model(String[] columns, boolean editable) {
         return model(columns, editable ? 0 : Integer.MAX_VALUE);
     }
@@ -244,20 +232,6 @@ public final class UIKit {
         };
     }
 
-    /**
-     * Columns from {@code firstEditableColumn} up to (but not including) {@code endColumn} are editable.
-     * Used when input columns are followed by read-only result columns.
-     */
-    public static DefaultTableModel model(String[] columns, final int firstEditableColumn, final int endColumn) {
-        return new DefaultTableModel(columns, 0) {
-            @Override
-            public boolean isCellEditable(int row, int column) {
-                return column >= firstEditableColumn && column < endColumn;
-            }
-        };
-    }
-
-    /** Styled table: row height, centred cells, single-line rows and no column reordering. */
     public static JTable table(DefaultTableModel model) {
         JTable table = new JTable(model);
         table.setRowHeight(30);
@@ -268,16 +242,8 @@ public final class UIKit {
         table.getTableHeader().setReorderingAllowed(false);
         table.putClientProperty("terminateEditOnFocusLost", Boolean.TRUE);
 
-        // Re-apply the alignment on every call: a look-and-feel switch can reset it.
-        DefaultTableCellRenderer centered = new DefaultTableCellRenderer() {
-            @Override
-            public Component getTableCellRendererComponent(JTable t, Object value, boolean selected,
-                                                           boolean focused, int row, int column) {
-                super.getTableCellRendererComponent(t, value, selected, focused, row, column);
-                setHorizontalAlignment(SwingConstants.CENTER);
-                return this;
-            }
-        };
+        DefaultTableCellRenderer centered = new DefaultTableCellRenderer();
+        centered.setHorizontalAlignment(SwingConstants.CENTER);
         table.setDefaultRenderer(Object.class, centered);
 
         TableCellRenderer headerRenderer = table.getTableHeader().getDefaultRenderer();
@@ -287,21 +253,18 @@ public final class UIKit {
         return table;
     }
 
-    /** Scroll pane with smooth scrolling. */
     public static JScrollPane scroll(JComponent view) {
         JScrollPane scrollPane = new JScrollPane(view);
         scrollPane.putClientProperty("JScrollPane.smoothScrolling", Boolean.TRUE);
         return scrollPane;
     }
 
-    /** Commits a cell that is still being edited so its value is read correctly. */
     public static void stopEditing(JTable table) {
         if (table.isEditing() && table.getCellEditor() != null) {
             table.getCellEditor().stopCellEditing();
         }
     }
 
-    /** Deletes the selected rows, last first so the indices stay valid. */
     public static void removeSelectedRows(JTable table) {
         stopEditing(table);
         int[] selected = table.getSelectedRows();
@@ -313,16 +276,10 @@ public final class UIKit {
 
     /** Validates that every cell from {@code fromColumn} onward is a non-negative whole number. */
     public static boolean validateNumericTable(JTable table, int fromColumn, String tableName, Component parent) {
-        return validateNumericTable(table, fromColumn, table.getModel().getColumnCount(), tableName, parent);
-    }
-
-    /** Same as above but only checks columns {@code fromColumn} to {@code toColumn - 1}. */
-    public static boolean validateNumericTable(JTable table, int fromColumn, int toColumn,
-                                               String tableName, Component parent) {
         stopEditing(table);
         DefaultTableModel model = (DefaultTableModel) table.getModel();
         for (int row = 0; row < model.getRowCount(); row++) {
-            for (int column = fromColumn; column < toColumn; column++) {
+            for (int column = fromColumn; column < model.getColumnCount(); column++) {
                 Object value = model.getValueAt(row, column);
                 String text = value == null ? "" : value.toString().trim();
                 boolean valid = text.matches("\\d+");
@@ -338,14 +295,12 @@ public final class UIKit {
         return true;
     }
 
-    /** Reads a cell as an int. Call validateNumericTable first. */
     public static int intAt(DefaultTableModel model, int row, int column) {
         return Integer.parseInt(model.getValueAt(row, column).toString().trim());
     }
 
     // ------------------------------------------------------------ validation
 
-    /** Parses a whole number within [min, max]. Shows an error and returns null when invalid. */
     public static Integer parseInt(JTextField field, String name, int min, int max, Component parent) {
         try {
             int value = Integer.parseInt(field.getText().trim());
@@ -359,7 +314,6 @@ public final class UIKit {
         }
     }
 
-    /** Parses "1, 2, 3" or "1 2 3" into ints (each at least {@code min}); null plus an error when invalid. */
     public static int[] parseIntList(JTextField field, String name, int min, Component parent) {
         String text = field.getText().trim();
         if (text.isEmpty()) {
@@ -393,7 +347,6 @@ public final class UIKit {
         return (long) (amount * Math.pow(1024, power));
     }
 
-    /** Parses a size field such as "4KB" into bytes; null plus an error when invalid. */
     public static Long parseSizeField(JTextField field, String name, Component parent) {
         try {
             long bytes = parseSize(field.getText());
@@ -407,7 +360,6 @@ public final class UIKit {
         }
     }
 
-    /** Parses a comma-separated list of sizes ("100KB, 500KB") into bytes. */
     public static long[] parseSizeList(JTextField field, String name, Component parent) {
         String text = field.getText().trim();
         if (text.isEmpty()) {
@@ -426,7 +378,6 @@ public final class UIKit {
         return values;
     }
 
-    /** Formats bytes with the largest unit that divides evenly, e.g. 4096 -> "4 KB". */
     public static String formatSize(long bytes) {
         String[] units = {"B", "KB", "MB", "GB", "TB"};
         double value = bytes;
@@ -438,7 +389,6 @@ public final class UIKit {
         return (value == Math.floor(value) ? String.valueOf((long) value) : String.format("%.2f", value)) + " " + units[unit];
     }
 
-    /** Marks the field invalid, shows the message, selects the text and returns null. */
     private static <T> T reject(JTextField field, Component parent, String message) {
         markInvalid(field, true);
         error(parent, message);
@@ -447,14 +397,12 @@ public final class UIKit {
         return null;
     }
 
-    /** Standard "Check your input" error dialog. */
     public static void error(Component parent, String message) {
         JOptionPane.showMessageDialog(parent, message, "Check your input", JOptionPane.ERROR_MESSAGE);
     }
 
     // ---------------------------------------------------------------- colors
 
-    // Theme-aware colours used by the custom-painted components below.
     static Color cardBackground() {
         Color base = UIManager.getColor("Panel.background");
         if (base == null) {
@@ -481,96 +429,15 @@ public final class UIKit {
         return color != null ? color : Color.GRAY;
     }
 
-    /** True for dark colours (perceived brightness below 50%). */
     static boolean isDark(Color color) {
         return (0.299 * color.getRed() + 0.587 * color.getGreen() + 0.114 * color.getBlue()) < 128;
     }
 
-    /** Blends a toward b; amount 0 gives a, amount 1 gives b. */
     static Color mix(Color a, Color b, float amount) {
         return new Color(
                 Math.round(a.getRed() + (b.getRed() - a.getRed()) * amount),
                 Math.round(a.getGreen() + (b.getGreen() - a.getGreen()) * amount),
                 Math.round(a.getBlue() + (b.getBlue() - a.getBlue()) * amount));
-    }
-
-    /**
-     * Gives a table a two-level header: group titles (e.g. "ALLOCATION") spanning several columns
-     * above the individual column names. A group with a null title is drawn as a single tall cell
-     * showing the column name.
-     *
-     * @param titles one title per group
-     * @param spans  how many columns each group covers; must add up to the column count
-     */
-    public static void groupedHeader(JTable table, String[] titles, int[] spans) {
-        GroupedHeader header = new GroupedHeader(table, titles, spans);
-        table.setTableHeader(header);
-        table.getTableHeader().setReorderingAllowed(false);
-        table.getTableHeader().setResizingAllowed(false);
-    }
-
-    /** Table header that paints a group row above the normal column-name row. */
-    private static final class GroupedHeader extends javax.swing.table.JTableHeader {
-        private final String[] titles;
-        private final int[] spans;
-
-        GroupedHeader(JTable table, String[] titles, int[] spans) {
-            super(table.getColumnModel());
-            this.titles = titles;
-            this.spans = spans;
-            setOpaque(true);
-        }
-
-        @Override
-        public Dimension getPreferredSize() {
-            Dimension size = super.getPreferredSize();
-            return new Dimension(size.width, 56);
-        }
-
-        @Override
-        protected void paintComponent(Graphics g) {
-            Graphics2D g2 = (Graphics2D) g.create();
-            g2.setRenderingHint(RenderingHints.KEY_TEXT_ANTIALIASING, RenderingHints.VALUE_TEXT_ANTIALIAS_ON);
-            Color background = UIManager.getColor("TableHeader.background");
-            g2.setColor(background != null ? background : getBackground());
-            g2.fillRect(0, 0, getWidth(), getHeight());
-            Color foreground = UIManager.getColor("TableHeader.foreground");
-            g2.setFont(getFont().deriveFont(Font.BOLD));
-            FontMetrics metrics = g2.getFontMetrics();
-            int half = getHeight() / 2;
-
-            int column = 0;
-            for (int group = 0; group < titles.length && column < getColumnModel().getColumnCount(); group++) {
-                int span = spans[group];
-                Rectangle first = getHeaderRect(column);
-                Rectangle last = getHeaderRect(Math.min(column + span - 1, getColumnModel().getColumnCount() - 1));
-                int x = first.x;
-                int width = last.x + last.width - first.x;
-                g2.setColor(borderColor());
-                if (titles[group] == null) {
-                    drawCell(g2, metrics, foreground, getColumnModel().getColumn(column).getHeaderValue().toString(),
-                            x, 0, width, getHeight());
-                } else {
-                    drawCell(g2, metrics, foreground, titles[group], x, 0, width, half);
-                    for (int i = column; i < column + span; i++) {
-                        Rectangle r = getHeaderRect(i);
-                        drawCell(g2, metrics, foreground, getColumnModel().getColumn(i).getHeaderValue().toString(),
-                                r.x, half, r.width, getHeight() - half);
-                    }
-                }
-                column += span;
-            }
-            g2.dispose();
-        }
-
-        private void drawCell(Graphics2D g2, FontMetrics metrics, Color foreground, String text,
-                              int x, int y, int width, int height) {
-            g2.setColor(borderColor());
-            g2.drawRect(x, y, width - 1, height - 1);
-            g2.setColor(foreground != null ? foreground : textColor());
-            g2.drawString(text, x + (width - metrics.stringWidth(text)) / 2,
-                    y + (height + metrics.getAscent() - metrics.getDescent()) / 2);
-        }
     }
 
     // ------------------------------------------------------------ components
@@ -651,7 +518,6 @@ public final class UIKit {
         }
     }
 
-    /** Lays the given stat tiles out in one equal-width row. */
     public static JPanel stats(Stat... stats) {
         JPanel panel = transparent(new GridLayout(1, stats.length, 10, 0));
         for (Stat stat : stats) {

@@ -2,24 +2,15 @@ import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 
-/**
- * Module 5: Segmentation.
- * 
- * The user sets the RAM size and the number of segments; the table lists each segment's name,
- * base address and limit.
- */
 public class SegmentationPanel extends JPanel {
-    // Names given to newly generated segments (later ones are "Segment N").
     private static final String[] DEFAULT_NAMES = {"Code", "Data", "Stack", "Heap"};
 
-    // Inputs and the editable segment table.
     private final JTextField ramSizeField;
     private final JTextField segCountField;
     private final DefaultTableModel tableModel;
     private final JTable segTable;
     private final UIKit.Section tableSection;
 
-    /** Builds the configuration card and the segment table with three sample segments. */
     public SegmentationPanel() {
         UIKit.setupModule(this);
         add(UIKit.header("Segmentation",
@@ -49,7 +40,6 @@ public class SegmentationPanel extends JPanel {
         add(center, BorderLayout.CENTER);
     }
 
-    /** Validates the inputs, then adds or removes rows so the table has exactly the requested number of segments. */
     private void generate() {
         Long ram = UIKit.parseSizeField(ramSizeField, "Size of RAM", this);
         if (ram == null) return;
@@ -72,7 +62,6 @@ public class SegmentationPanel extends JPanel {
     protected void onGenerate(long ramBytes, int segmentCount) {
     }
 
-    /** The segment table model, for the allocation logic. */
     public DefaultTableModel getSegmentModel() {
         return tableModel;
     }

@@ -3,15 +3,7 @@ import java.awt.*;
 import java.awt.event.InputEvent;
 import java.awt.event.KeyEvent;
 
-/**
- * Main application window.
- * 
- * A top bar (title, module selector, light/dark button) sits above a CardLayout that holds the
- * welcome page and the eight simulator modules. Modules can be opened from the selector, the
- * welcome cards or Ctrl+0 to Ctrl+8.
- */
 public class MainFrame extends JFrame {
-    // Names and one-line descriptions of the eight modules, in menu order.
     private static final String WELCOME = "Welcome";
     private static final String[] MODULES = {
             "CPU Scheduling", "Banker's Algorithm", "Paging", "Page Replacement",
@@ -28,15 +20,11 @@ public class MainFrame extends JFrame {
             "Job queue and chronological execution log."
     };
 
-    // Card container that swaps between the welcome page and the module panels.
     private final CardLayout cardLayout = new CardLayout();
     private final JPanel mainContainer = new JPanel(cardLayout);
     private final JComboBox<String> moduleSelector;
     private final JButton themeButton = new JButton();
 
-    /**
-     * Builds the window: selector, menu bar, welcome page and one panel per module.
-     */
     public MainFrame() {
         setTitle("Operating System\u2013 System Simulator");
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
@@ -44,7 +32,6 @@ public class MainFrame extends JFrame {
         setSize(1200, 800);
         setLocationRelativeTo(null);
 
-        // Selector entries: "Welcome" first, then "1. CPU Scheduling" ... "8. Multiprogramming".
         String[] items = new String[MODULES.length + 1];
         items[0] = WELCOME;
         for (int i = 0; i < MODULES.length; i++) {
@@ -63,7 +50,6 @@ public class MainFrame extends JFrame {
         setJMenuBar(createMenuBar());
         add(createTopBar(), BorderLayout.NORTH);
 
-        // One panel per module; their order must match MODULES.
         JPanel[] panels = {
                 new CPUSchedulingPanel(), new BankersPanel(), new PagingPanel(), new PageReplacementPanel(),
                 new SegmentationPanel(), new FragmentationPanel(), new DiskSchedulingPanel(),
@@ -76,12 +62,10 @@ public class MainFrame extends JFrame {
         add(mainContainer, BorderLayout.CENTER);
     }
 
-    /** Shows module {@code index} (0 = Welcome) by changing the selector, which switches the card. */
     private void showModule(int index) {
         moduleSelector.setSelectedIndex(index);
     }
 
-    /** Top bar: app name on the left; module selector and theme button on the right. */
     private JComponent createTopBar() {
         JLabel appName = new JLabel("OS Simulator");
         UIKit.styleClass(appName, "h3", Font.BOLD, 1.25f);
@@ -91,7 +75,7 @@ public class MainFrame extends JFrame {
         selectorLabel.setLabelFor(moduleSelector);
         moduleSelector.setPreferredSize(new Dimension(230, moduleSelector.getPreferredSize().height));
 
-        themeButton.setEnabled(true);
+        themeButton.setEnabled(Theme.isFlatLaf());
         themeButton.addActionListener(e -> toggleTheme());
         updateThemeButton();
 
@@ -102,7 +86,6 @@ public class MainFrame extends JFrame {
         return bar;
     }
 
-    /** Menu bar with File (Exit), View (theme toggle) and Modules (Ctrl+0 to Ctrl+8 shortcuts). */
     private JMenuBar createMenuBar() {
         int shortcut = InputEvent.CTRL_DOWN_MASK;
         JMenuBar menuBar = new JMenuBar();
@@ -118,7 +101,7 @@ public class MainFrame extends JFrame {
         view.setMnemonic(KeyEvent.VK_V);
         JMenuItem toggleTheme = new JMenuItem("Toggle light / dark theme");
         toggleTheme.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_T, shortcut));
-        toggleTheme.setEnabled(true);
+        toggleTheme.setEnabled(Theme.isFlatLaf());
         toggleTheme.addActionListener(e -> toggleTheme());
         view.add(toggleTheme);
 
@@ -141,19 +124,16 @@ public class MainFrame extends JFrame {
         return menuBar;
     }
 
-    /** Switches between light and dark and refreshes the button label. */
     private void toggleTheme() {
         Theme.toggle(this);
         updateThemeButton();
     }
 
-    /** The button names the theme it will switch TO ("Light mode" while dark). */
     private void updateThemeButton() {
         themeButton.setText(Theme.isDark() ? "Light mode" : "Dark mode");
         themeButton.setToolTipText("Switch theme (Ctrl+T)");
     }
 
-    /** Welcome page: heading, a grid of clickable module cards and a shortcut tip. */
     private JComponent createWelcomePanel() {
         JPanel grid = UIKit.transparent(new GridLayout(0, 4, 12, 12));
         for (int i = 0; i < MODULES.length; i++) {
@@ -176,7 +156,6 @@ public class MainFrame extends JFrame {
         return scroll;
     }
 
-    /** One clickable card (number, title, description) that opens module {@code index + 1}. */
     private JButton createModuleCard(int index) {
         JLabel number = UIKit.muted(String.format("%02d", index + 1));
         JLabel title = new JLabel(MODULES[index]);
@@ -201,7 +180,6 @@ public class MainFrame extends JFrame {
         return card;
     }
 
-    /** Entry point: installs the theme, then opens the window on the Swing event thread. */
     public static void main(String[] args) {
         System.setProperty("apple.laf.useScreenMenuBar", "true");
         SwingUtilities.invokeLater(() -> {

@@ -7,14 +7,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 
-/**
- * Module 4: Page Replacement.
- * 
- * Shows a frame-by-frame trace (one column per reference, one row per frame, plus a Hit/Miss row)
- * and fault/hit statistics for FIFO, LRU or Optimal.
- */
 public class PageReplacementPanel extends JPanel {
-    // Inputs: reference string, frame count and algorithm choice.
     private final JTextField referenceField;
     private final JTextField framesField;
     private final ButtonGroup algorithmGroup = new ButtonGroup();
@@ -42,7 +35,6 @@ public class PageReplacementPanel extends JPanel {
     private int highlightedStep = -1;
     private int highlightedFrame = -1;
 
-    /** Builds the configuration card, the frame trace table and the statistics tiles. */
     public PageReplacementPanel() {
         UIKit.setupModule(this);
         add(UIKit.header("Page Replacement",
@@ -99,7 +91,6 @@ public class PageReplacementPanel extends JPanel {
         add(center, BorderLayout.CENTER);
     }
 
-    /** Name of the selected algorithm button. */
     private String selectedAlgorithm() {
         if (lruBtn.isSelected()) return "LRU";
         if (optimalBtn.isSelected()) return "Optimal";

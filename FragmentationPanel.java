@@ -4,14 +4,7 @@ import java.awt.*;
 import java.util.EnumMap;
 import java.util.Map;
 
-/**
- * Module 6: Memory Fragmentation.
- * 
- * The user enters block and process sizes; one result table per strategy (First, Best, Next Fit)
- * shows where each process was placed and what is left over.
- */
 public class FragmentationPanel extends JPanel {
-    /** The three placement strategies, with the label shown in the UI. */
     public enum Fit {
         FIRST("First Fit"), BEST("Best Fit"), NEXT("Next Fit");
 
@@ -22,17 +15,14 @@ public class FragmentationPanel extends JPanel {
         }
     }
 
-    // Columns shared by all three result tables.
     private static final String[] RESULT_COLUMNS = {"Process", "Size", "Block", "Leftover"};
 
-    // Inputs, one result table/summary label per strategy, and the results card.
     private final JTextField blocksField;
     private final JTextField processesField;
     private final Map<Fit, DefaultTableModel> resultModels = new EnumMap<>(Fit.class);
     private final Map<Fit, JLabel> summaryLabels = new EnumMap<>(Fit.class);
     private final UIKit.Section resultsSection;
 
-    /** Builds the configuration card and three side-by-side result columns. */
     public FragmentationPanel() {
         UIKit.setupModule(this);
         add(UIKit.header("Memory Fragmentation",
@@ -62,7 +52,6 @@ public class FragmentationPanel extends JPanel {
         add(center, BorderLayout.CENTER);
     }
 
-    /** One result column: strategy title, result table and fragmentation summary. */
     private JComponent createFitColumn(Fit fit) {
         DefaultTableModel model = UIKit.model(RESULT_COLUMNS, false);
         resultModels.put(fit, model);
@@ -80,7 +69,6 @@ public class FragmentationPanel extends JPanel {
         return column;
     }
 
-    /** Validates both size lists, then calls {@link #onSimulate}. */
     private void simulate() {
         long[] blocks = UIKit.parseSizeList(blocksField, "Memory block sizes", this);
         if (blocks == null) return;
@@ -97,7 +85,6 @@ public class FragmentationPanel extends JPanel {
     protected void onSimulate(long[] blockBytes, long[] processBytes) {
     }
 
-    /** Fills the table and summary line of one strategy. */
     public void showResults(Fit fit, Object[][] rows, String fragmentationSummary) {
         resultModels.get(fit).setDataVector(rows, RESULT_COLUMNS);
         summaryLabels.get(fit).setText(fragmentationSummary);
