@@ -2,22 +2,33 @@ import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
 
+/**
+ * Module 7: Disk Scheduling.
+ * 
+ * The user enters a request queue, head position, disk size and algorithm. The panel lists each
+ * seek (from track, to track, distance), shows total and average head movement and animates
+ * the path in a {@link HeadMovementChart}.
+ */
 public class DiskSchedulingPanel extends JPanel {
+    // Algorithm names shown as option buttons, and the columns of the service-order table.
     private static final String[] ALGORITHMS = {"FCFS", "SSTF", "SCAN", "C-SCAN", "LOOK", "C-LOOK"};
     private static final String[] COLUMNS = {"Step", "From Track", "To Track", "Head Movement"};
 
+    // Inputs.
     private final JTextField requestField;
     private final JTextField headField;
     private final JTextField diskSizeField;
     private final JComboBox<String> directionBox;
     private final ButtonGroup algorithmGroup = new ButtonGroup();
     private final JToggleButton[] algorithmButtons = new JToggleButton[ALGORITHMS.length];
+    // Outputs: service-order table, head chart and summary tiles.
     private final DefaultTableModel tableModel;
     private final HeadMovementChart chart = new HeadMovementChart();
     private final UIKit.Section chartSection;
     private final UIKit.Stat totalStat = new UIKit.Stat("Total head movement", "—");
     private final UIKit.Stat averageStat = new UIKit.Stat("Average seek length", "—");
 
+    /** Builds the request form, the head movement chart and the service-order table. */
     public DiskSchedulingPanel() {
         UIKit.setupModule(this);
         add(UIKit.header("Disk Scheduling",
@@ -69,6 +80,7 @@ public class DiskSchedulingPanel extends JPanel {
         showResult(new int[]{50, 30, 40, 55, 30, 20}, 200, false);
     }
 
+    /** Name of the selected algorithm button (FCFS if none). */
     private String selectedAlgorithm() {
         for (int i = 0; i < algorithmButtons.length; i++) {
             if (algorithmButtons[i].isSelected()) {
@@ -78,11 +90,13 @@ public class DiskSchedulingPanel extends JPanel {
         return ALGORITHMS[0];
     }
 
+    /** Direction only matters for the sweep algorithms (SCAN, C-SCAN, LOOK, C-LOOK). */
     private void updateDirectionState() {
         String algorithm = selectedAlgorithm();
         directionBox.setEnabled(!"FCFS".equals(algorithm) && !"SSTF".equals(algorithm));
     }
 
+    /** Validates every input (tracks must lie inside the disk), computes the order and shows it. */
     private void run() {
         Integer diskSize = UIKit.parseInt(diskSizeField, "Disk size", 2, 100000, this);
         if (diskSize == null) return;
@@ -115,15 +129,10 @@ public class DiskSchedulingPanel extends JPanel {
      */
     protected int[] computeServiceOrder(String algorithm, int head, int[] requests, int diskSize,
                                         boolean towardHigher) {
-        if ("FCFS".equals(algorithm)) {
-            int[] order = new int[requests.length + 1];
-            order[0] = head;
-            System.arraycopy(requests, 0, order, 1, requests.length);
-            return order;
-        }
         return null;
     }
 
+    /** Fills the table with every seek, updates the totals and redraws the chart. */
     public void showResult(int[] order, int diskSize, boolean animate) {
         tableModel.setRowCount(0);
         long total = 0;
