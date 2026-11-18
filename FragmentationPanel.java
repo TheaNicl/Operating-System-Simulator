@@ -74,14 +74,12 @@ public class FragmentationPanel extends JPanel {
         finalMapModel = UIKit.model(new String[]{"Block #", "Base Address", "Size", "Status / Process"}, false);
         JTable finalMapTable = UIKit.table(finalMapModel);
         JPanel algorithmButtons = UIKit.transparent(new FlowLayout(FlowLayout.LEFT, 8, 0));
-        ButtonGroup fitGroup = new ButtonGroup();
-        for (Fit fit : Fit.values()) {
-            JToggleButton button = UIKit.option("Run " + fit.label, fitGroup);
-            if (fit == Fit.FIRST) {
-                button.setSelected(true);
-            }
-            algorithmButtons.add(button);
-        }
+        JButton firstFitBtn = UIKit.secondary("Run First Fit");
+        JButton bestFitBtn = UIKit.secondary("Run Best Fit");
+        JButton nextFitBtn = UIKit.secondary("Run Next Fit");
+        algorithmButtons.add(firstFitBtn);
+        algorithmButtons.add(bestFitBtn);
+        algorithmButtons.add(nextFitBtn);
 
         JPanel finalMapBody = UIKit.transparent(new BorderLayout(0, 10));
         finalMapBody.add(algorithmButtons, BorderLayout.NORTH);
