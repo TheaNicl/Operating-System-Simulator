@@ -30,10 +30,10 @@ public class SegmentationPanel extends JPanel {
         JPanel configBody = UIKit.transparent(new BorderLayout(0, 12));
         configBody.add(UIKit.form(1, "Size of RAM", ramSizeField), BorderLayout.CENTER);
         configBody.add(UIKit.toolbar(
-                UIKit.muted("Addresses and limits are in bytes; ranges must fit in RAM without overlap."),
+                UIKit.muted("Enter B, KB, MB, GB or TB (e.g. 4KB = 4096B); ranges must fit in RAM without overlap."),
                 runBtn), BorderLayout.SOUTH);
 
-        tableModel = UIKit.model(new String[]{"Segment #", "Name", "Base Address (B)", "Limit (B)"}, 1);
+        tableModel = UIKit.model(new String[]{"Segment #", "Name", "Base Address", "Limit"}, 1);
         Object[] newSegment = getNewSegment(0);
         tableModel.addRow(newSegment);
         segTable = UIKit.table(tableModel);
@@ -91,9 +91,9 @@ public class SegmentationPanel extends JPanel {
                 return;
             }
 
-            Long base = parseTableLong(row, 2);
+            Long base = parseTableSize(row, 2);
             if (base == null) return;
-            Long limit = parseTableLong(row, 3);
+            Long limit = parseTableSize(row, 3);
             if (limit == null) return;
             if (limit == 0) {
                 rejectCell(row, 3, "Segment limit must be greater than zero.");
@@ -114,20 +114,18 @@ public class SegmentationPanel extends JPanel {
             ranges[row][0] = base;
             ranges[row][1] = end;
         }
-        tableSection.setHint(tableModel.getRowCount() + " segments validated \u00b7 RAM " + UIKit.formatSize(ram));
+        tableSection.setHint(tableModel.getRowCount() + " segments validated; values converted to bytes \u00b7 RAM "
+                + UIKit.formatSize(ram));
     }
 
-    private Long parseTableLong(int row, int column) {
+    private Long parseTableSize(int row, int column) {
         Object value = tableModel.getValueAt(row, column);
         String text = value == null ? "" : value.toString().trim();
-        if (!text.matches("\\d+")) {
-            rejectCell(row, column, tableModel.getColumnName(column) + " must be a whole number (0 or more).");
-            return null;
-        }
         try {
-            return Long.parseLong(text);
-        } catch (NumberFormatException e) {
-            rejectCell(row, column, tableModel.getColumnName(column) + " is too large.");
+            return UIKit.parseSize(text);
+        } catch (IllegalArgumentException e) {
+            rejectCell(row, column, tableModel.getColumnName(column)
+                    + " must be a size like 4096, 4KB, 4MB, 4GB or 1TB.");
             return null;
         }
     }
