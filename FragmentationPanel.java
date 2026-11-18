@@ -1,17 +1,15 @@
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
-import java.util.EnumMap;
-import java.util.Map;
 
 /**
  * Module 6: Memory Fragmentation.
- * 
- * The user enters block and process sizes; one result table per strategy (First, Best, Next Fit)
- * shows where each process was placed and what is left over.
+ *
+ * Editable starting memory and process tables sit above a single final-map table. Algorithm
+ * buttons are present for UI selection only; memory placement is not implemented yet.
  */
 public class FragmentationPanel extends JPanel {
-    /** The three placement strategies, with the label shown in the UI. */
+    /** The placement strategies available in the UI. */
     public enum Fit {
         FIRST("First Fit"), BEST("Best Fit"), NEXT("Next Fit");
 
@@ -22,84 +20,100 @@ public class FragmentationPanel extends JPanel {
         }
     }
 
-    // Columns shared by all three result tables.
-    private static final String[] RESULT_COLUMNS = {"Process", "Size", "Block", "Leftover"};
+    private final DefaultTableModel memoryModel;
+    private final JTable memoryTable;
+    private final DefaultTableModel processModel;
+    private final JTable processTable;
+    private final DefaultTableModel finalMapModel;
 
-    // Inputs, one result table/summary label per strategy, and the results card.
-    private final JTextField blocksField;
-    private final JTextField processesField;
-    private final Map<Fit, DefaultTableModel> resultModels = new EnumMap<>(Fit.class);
-    private final Map<Fit, JLabel> summaryLabels = new EnumMap<>(Fit.class);
-    private final UIKit.Section resultsSection;
-
-    /** Builds the configuration card and three side-by-side result columns. */
+    /** Builds editable starting-map and process tables above the single final-map table. */
     public FragmentationPanel() {
         UIKit.setupModule(this);
         add(UIKit.header("Memory Fragmentation",
-                "Compare First Fit, Best Fit and Next Fit placement for the same blocks and processes."),
-                BorderLayout.NORTH);
+                "Enter the current memory map and processes, then choose a placement strategy."), BorderLayout.NORTH);
 
-        blocksField = UIKit.field("32GB, 48GB, 64GB, 16GB", "e.g. 100KB, 500KB, 200KB", 28);
-        processesField = UIKit.field("15GB, 30GB, 40GB", "e.g. 212KB, 417KB", 28);
-        JButton runBtn = UIKit.primary("Simulate allocation");
-        runBtn.addActionListener(e -> simulate());
+        memoryModel = UIKit.model(new String[]{"Block #", "Base Address", "Size", "Status"}, 1);
+        memoryModel.addRow(new Object[]{"0", "0B", "32GB", "Free"});
+        memoryModel.addRow(new Object[]{"1", "32GB", "48GB", "Free"});
+        memoryModel.addRow(new Object[]{"2", "80GB", "64GB", "Free"});
+        memoryModel.addRow(new Object[]{"3", "144GB", "16GB", "Free"});
+        memoryTable = UIKit.table(memoryModel);
+        memoryTable.getColumnModel().getColumn(3).setCellEditor(
+                new DefaultCellEditor(new JComboBox<>(new String[]{"Free", "Occupied"})));
 
-        JPanel configBody = UIKit.transparent(new BorderLayout(0, 12));
-        configBody.add(UIKit.form(1, "Memory block sizes", blocksField, "Process sizes", processesField),
-                BorderLayout.CENTER);
-        configBody.add(UIKit.toolbar(UIKit.muted("Comma-separated. Sizes accept B, KB, MB, GB or TB."), runBtn),
-                BorderLayout.SOUTH);
+        JButton addMemoryBtn = UIKit.secondary("Add block");
+        JButton removeMemoryBtn = UIKit.secondary("Remove selected");
+        addMemoryBtn.addActionListener(e -> addMemoryBlock());
+        removeMemoryBtn.addActionListener(e -> {
+            UIKit.removeSelectedRows(memoryTable);
+            renumber(memoryModel, false);
+        });
+        JPanel memoryBody = createTableBody(memoryTable, addMemoryBtn, removeMemoryBtn);
+        UIKit.Section memorySection = new UIKit.Section("Current Memory Map", "Sizes accept B, KB, MB, GB or TB.",
+                memoryBody);
 
-        JPanel columns = UIKit.transparent(new GridLayout(1, 3, 12, 0));
+        processModel = UIKit.model(new String[]{"Process #", "Name", "Size"}, 1);
+        processModel.addRow(new Object[]{"1", "P1", "15GB"});
+        processModel.addRow(new Object[]{"2", "P2", "30GB"});
+        processModel.addRow(new Object[]{"3", "P3", "40GB"});
+        processTable = UIKit.table(processModel);
+
+        JButton addProcessBtn = UIKit.secondary("Add process");
+        JButton removeProcessBtn = UIKit.secondary("Remove selected");
+        addProcessBtn.addActionListener(e -> addProcess());
+        removeProcessBtn.addActionListener(e -> {
+            UIKit.removeSelectedRows(processTable);
+            renumber(processModel, true);
+        });
+        JPanel processBody = createTableBody(processTable, addProcessBtn, removeProcessBtn);
+        UIKit.Section processSection = new UIKit.Section("Processes", "Process sizes accept B, KB, MB, GB or TB.",
+                processBody);
+
+        JComponent inputs = UIKit.split(JSplitPane.HORIZONTAL_SPLIT, memorySection, processSection, 0.5);
+
+        finalMapModel = UIKit.model(new String[]{"Block #", "Base Address", "Size", "Status / Process"}, false);
+        JTable finalMapTable = UIKit.table(finalMapModel);
+        JPanel algorithmButtons = UIKit.transparent(new FlowLayout(FlowLayout.LEFT, 8, 0));
+        ButtonGroup fitGroup = new ButtonGroup();
         for (Fit fit : Fit.values()) {
-            columns.add(createFitColumn(fit));
+            JToggleButton button = UIKit.option("Run " + fit.label, fitGroup);
+            if (fit == Fit.FIRST) {
+                button.setSelected(true);
+            }
+            algorithmButtons.add(button);
         }
-        resultsSection = new UIKit.Section("Allocation Results", columns);
 
-        JPanel center = UIKit.transparent(new BorderLayout(0, 16));
-        center.add(new UIKit.Section("Configuration", configBody), BorderLayout.NORTH);
-        center.add(resultsSection, BorderLayout.CENTER);
-        add(center, BorderLayout.CENTER);
+        JPanel finalMapBody = UIKit.transparent(new BorderLayout(0, 10));
+        finalMapBody.add(algorithmButtons, BorderLayout.NORTH);
+        finalMapBody.add(UIKit.scroll(finalMapTable), BorderLayout.CENTER);
+        UIKit.Section finalMapSection = new UIKit.Section("Final Memory Map",
+                "Choose a run button; allocation logic is not implemented yet.", finalMapBody);
+
+        add(UIKit.split(JSplitPane.VERTICAL_SPLIT, inputs, finalMapSection, 0.5), BorderLayout.CENTER);
     }
 
-    /** One result column: strategy title, result table and fragmentation summary. */
-    private JComponent createFitColumn(Fit fit) {
-        DefaultTableModel model = UIKit.model(RESULT_COLUMNS, false);
-        resultModels.put(fit, model);
-        JTable table = UIKit.table(model);
-
-        JLabel title = new JLabel(fit.label);
-        UIKit.styleClass(title, "semibold", Font.BOLD, 1f);
-        JLabel summary = UIKit.muted("Fragmentation: —");
-        summaryLabels.put(fit, summary);
-
-        JPanel column = UIKit.transparent(new BorderLayout(0, 8));
-        column.add(title, BorderLayout.NORTH);
-        column.add(UIKit.scroll(table), BorderLayout.CENTER);
-        column.add(summary, BorderLayout.SOUTH);
-        return column;
+    private JPanel createTableBody(JTable table, JButton addButton, JButton removeButton) {
+        JPanel body = UIKit.transparent(new BorderLayout(0, 10));
+        body.add(UIKit.scroll(table), BorderLayout.CENTER);
+        body.add(UIKit.row(addButton, removeButton), BorderLayout.SOUTH);
+        return body;
     }
 
-    /** Validates both size lists, then calls {@link #onSimulate}. */
-    private void simulate() {
-        long[] blocks = UIKit.parseSizeList(blocksField, "Memory block sizes", this);
-        if (blocks == null) return;
-        long[] processes = UIKit.parseSizeList(processesField, "Process sizes", this);
-        if (processes == null) return;
-        resultsSection.setHint(blocks.length + " blocks \u00b7 " + processes.length + " processes");
-        onSimulate(blocks, processes);
+    private void addMemoryBlock() {
+        UIKit.stopEditing(memoryTable);
+        int index = memoryModel.getRowCount();
+        memoryModel.addRow(new Object[]{String.valueOf(index), "", "", "Free"});
     }
 
-    /**
-     * Hook for the placement algorithms. Sizes are in bytes. For each strategy call
-     * {@link #showResults(Fit, Object[][], String)} with rows of {Process, Size, Block, Leftover}.
-     */
-    protected void onSimulate(long[] blockBytes, long[] processBytes) {
+    private void addProcess() {
+        UIKit.stopEditing(processTable);
+        int number = processModel.getRowCount() + 1;
+        processModel.addRow(new Object[]{String.valueOf(number), "P" + number, ""});
     }
 
-    /** Fills the table and summary line of one strategy. */
-    public void showResults(Fit fit, Object[][] rows, String fragmentationSummary) {
-        resultModels.get(fit).setDataVector(rows, RESULT_COLUMNS);
-        summaryLabels.get(fit).setText(fragmentationSummary);
+    private void renumber(DefaultTableModel model, boolean oneBased) {
+        for (int row = 0; row < model.getRowCount(); row++) {
+            model.setValueAt(String.valueOf(row + (oneBased ? 1 : 0)), row, 0);
+        }
     }
 }
