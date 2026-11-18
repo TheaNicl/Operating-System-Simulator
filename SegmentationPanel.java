@@ -1,6 +1,6 @@
+import java.awt.*;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
-import java.awt.*;
 
 /**
  * Module 5: Segmentation.
@@ -34,7 +34,8 @@ public class SegmentationPanel extends JPanel {
                 runBtn), BorderLayout.SOUTH);
 
         tableModel = UIKit.model(new String[]{"Segment #", "Name", "Base Address (B)", "Limit (B)"}, 1);
-        tableModel.addRow(new Object[]{"0", "", "", ""});
+        Object[] newSegment = getNewSegment(0);
+        tableModel.addRow(newSegment);
         segTable = UIKit.table(tableModel);
 
         JButton addBtn = UIKit.secondary("Add segment");
@@ -62,7 +63,7 @@ public class SegmentationPanel extends JPanel {
             UIKit.error(this, "A maximum of " + MAX_SEGMENTS + " segments is supported.");
             return;
         }
-        tableModel.addRow(new Object[]{"", "", "", ""});
+        tableModel.addRow(getNewSegment(tableModel.getRowCount()));
         renumberSegments();
     }
 
@@ -140,5 +141,10 @@ public class SegmentationPanel extends JPanel {
     /** The editable segment table model. */
     public DefaultTableModel getSegmentModel() {
         return tableModel;
+    }
+
+    private Object[] getNewSegment(int index) {
+        String segmentName = "Segment " + index;
+        return new Object[]{String.valueOf(index), segmentName, 0, 100};
     }
 }
