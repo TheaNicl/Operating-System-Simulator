@@ -167,10 +167,58 @@ public class BankersPanel extends JPanel {
     }
 
     /**
-     * BACK-END HOOK. Run the safety algorithm on the validated inputs, then call
-     * {@link #showResult}. Rows of {@code alloc} / {@code maxDemand} follow the table row order.
+     * Runs the safety algorithm on the validated inputs, then displays its result. Rows of
+     * {@code alloc} / {@code maxDemand} follow the table row order.
      */
     protected void onCalculate(int[] available, int[][] alloc, int[][] maxDemand) {
+        int processCount = alloc.length;
+        int resourceCount = RESOURCES.length;
+        int[][] need = new int[processCount][resourceCount];
+        long[][] workAtRun = new long[processCount][];
+        boolean[] finished = new boolean[processCount];
+        long[] work = new long[resourceCount];
+        List<String> safeSequence = new ArrayList<>();
+
+        for (int resource = 0; resource < resourceCount; resource++) {
+            work[resource] = available[resource];
+        }
+        for (int process = 0; process < processCount; process++) {
+            for (int resource = 0; resource < resourceCount; resource++) {
+                need[process][resource] = maxDemand[process][resource] - alloc[process][resource];
+            }
+        }
+
+        int finishedCount = 0;
+        boolean progress;
+        do {
+            progress = false;
+            for (int process = 0; process < processCount; process++) {
+                if (finished[process] || !canFinish(need[process], work)) {
+                    continue;
+                }
+
+                workAtRun[process] = work.clone();
+                for (int resource = 0; resource < resourceCount; resource++) {
+                    work[resource] += alloc[process][resource];
+                }
+                finished[process] = true;
+                finishedCount++;
+                safeSequence.add(String.valueOf(allocModel.getValueAt(process, 0)));
+                progress = true;
+            }
+        } while (progress && finishedCount < processCount);
+
+        showLongWorkResult(alloc, maxDemand, need, workAtRun,
+                finishedCount == processCount ? safeSequence : null);
+    }
+
+    private static boolean canFinish(int[] need, long[] work) {
+        for (int resource = 0; resource < need.length; resource++) {
+            if (need[resource] > work[resource]) {
+                return false;
+            }
+        }
+        return true;
     }
 
     /**
@@ -182,6 +230,20 @@ public class BankersPanel extends JPanel {
      */
     public void showResult(int[][] alloc, int[][] maxDemand, int[][] need, int[][] workAtRun,
                            List<String> safeSequence) {
+        long[][] longWorkAtRun = new long[workAtRun.length][];
+        for (int process = 0; process < workAtRun.length; process++) {
+            if (workAtRun[process] != null) {
+                longWorkAtRun[process] = new long[workAtRun[process].length];
+                for (int resource = 0; resource < workAtRun[process].length; resource++) {
+                    longWorkAtRun[process][resource] = workAtRun[process][resource];
+                }
+            }
+        }
+        showLongWorkResult(alloc, maxDemand, need, longWorkAtRun, safeSequence);
+    }
+
+    private void showLongWorkResult(int[][] alloc, int[][] maxDemand, int[][] need, long[][] workAtRun,
+                                    List<String> safeSequence) {
         int n = allocModel.getRowCount();
         int m = RESOURCES.length;
         outputModel.setRowCount(0);
