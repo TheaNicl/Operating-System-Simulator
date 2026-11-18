@@ -373,7 +373,7 @@ public class CPUSchedulingPanel extends JPanel {
             this.rows = table.getRowCount();
             Color bg = table.getBackground();
             background = bg != null ? bg : Color.WHITE;
-            foreground = UIKit.textColor(); // the table itself can report a stale colour after a theme switch
+            foreground = UIKit.textColor();
             label.setFont(table.getFont());
             return this;
         }

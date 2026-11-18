@@ -14,7 +14,7 @@ import java.util.regex.Pattern;
 /**
  * Shared building blocks so every module panel has the same spacing,
  * typography, tables, buttons and input validation.
- * Colors are resolved from UIManager at paint time so light/dark switching works.
+ * Colors are resolved from UIManager at paint time.
  */
 public final class UIKit {
     private static final Pattern SIZE_PATTERN =
@@ -454,13 +454,13 @@ public final class UIKit {
 
     // ---------------------------------------------------------------- colors
 
-    // Theme-aware colours used by the custom-painted components below.
+    // Light-theme colours used by the custom-painted components below.
     static Color cardBackground() {
         Color base = UIManager.getColor("Panel.background");
         if (base == null) {
             base = Color.WHITE;
         }
-        return isDark(base) ? mix(base, Color.WHITE, 0.05f) : mix(base, Color.WHITE, 0.7f);
+        return mix(base, Color.WHITE, 0.7f);
     }
 
     static Color borderColor() {
@@ -479,11 +479,6 @@ public final class UIKit {
     static Color mutedTextColor() {
         Color color = UIManager.getColor("Label.disabledForeground");
         return color != null ? color : Color.GRAY;
-    }
-
-    /** True for dark colours (perceived brightness below 50%). */
-    static boolean isDark(Color color) {
-        return (0.299 * color.getRed() + 0.587 * color.getGreen() + 0.114 * color.getBlue()) < 128;
     }
 
     /** Blends a toward b; amount 0 gives a, amount 1 gives b. */
