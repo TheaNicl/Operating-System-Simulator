@@ -19,7 +19,7 @@ public class SegmentationPanel extends JPanel {
     private final JTable segTable;
     private final UIKit.Section tableSection;
 
-    /** Builds the configuration card and the segment table with three sample segments. */
+    /** Builds the configuration card and an empty segment table. */
     public SegmentationPanel() {
         UIKit.setupModule(this);
         add(UIKit.header("Segmentation",
@@ -33,15 +33,13 @@ public class SegmentationPanel extends JPanel {
         JPanel configBody = UIKit.transparent(new BorderLayout(0, 12));
         configBody.add(UIKit.form(2, "Size of RAM", ramSizeField, "Number of segments", segCountField),
                 BorderLayout.CENTER);
-        configBody.add(UIKit.toolbar(UIKit.muted("Existing rows are kept when you change the count."), generateBtn),
+        configBody.add(UIKit.toolbar(UIKit.muted("RAM is divided evenly; base addresses and limits are in bytes."),
+                generateBtn),
                 BorderLayout.SOUTH);
 
-        tableModel = UIKit.model(new String[]{"Segment #", "Name", "Base Address", "Limit"}, 1);
-        tableModel.addRow(new Object[]{"0", "Code", "1000", "400"});
-        tableModel.addRow(new Object[]{"1", "Data", "2000", "500"});
-        tableModel.addRow(new Object[]{"2", "Stack", "3000", "300"});
+        tableModel = UIKit.model(new String[]{"Segment #", "Name", "Base Address (B)", "Limit (B)"}, 1);
         segTable = UIKit.table(tableModel);
-        tableSection = new UIKit.Section("Segment Table", "Double-click a cell to edit", UIKit.scroll(segTable));
+        tableSection = new UIKit.Section("Segment Table", "Run to generate segments", UIKit.scroll(segTable));
 
         JPanel center = UIKit.transparent(new BorderLayout(0, 16));
         center.add(new UIKit.Section("Configuration", configBody), BorderLayout.NORTH);
@@ -49,30 +47,35 @@ public class SegmentationPanel extends JPanel {
         add(center, BorderLayout.CENTER);
     }
 
-    /** Validates the inputs, then adds or removes rows so the table has exactly the requested number of segments. */
+    /** Validates the inputs, then partitions RAM into contiguous, evenly sized segments. */
     private void generate() {
         Long ram = UIKit.parseSizeField(ramSizeField, "Size of RAM", this);
         if (ram == null) return;
         Integer count = UIKit.parseInt(segCountField, "Number of segments", 1, 32, this);
         if (count == null) return;
+        if (count > ram) {
+            UIKit.markInvalid(segCountField, true);
+            UIKit.error(this, "Number of segments cannot exceed the RAM size in bytes.");
+            segCountField.requestFocusInWindow();
+            segCountField.selectAll();
+            return;
+        }
 
         UIKit.stopEditing(segTable);
-        while (tableModel.getRowCount() > count) {
-            tableModel.removeRow(tableModel.getRowCount() - 1);
-        }
-        for (int i = tableModel.getRowCount(); i < count; i++) {
+        tableModel.setRowCount(0);
+        long base = 0;
+        long bytesPerSegment = ram / count;
+        long remainder = ram % count;
+        for (int i = 0; i < count; i++) {
             String name = i < DEFAULT_NAMES.length ? DEFAULT_NAMES[i] : "Segment " + i;
-            tableModel.addRow(new Object[]{String.valueOf(i), name, "", ""});
+            long limit = bytesPerSegment + (i < remainder ? 1 : 0);
+            tableModel.addRow(new Object[]{String.valueOf(i), name, String.valueOf(base), String.valueOf(limit)});
+            base += limit;
         }
         tableSection.setHint(count + " segments \u00b7 RAM " + UIKit.formatSize(ram));
-        onGenerate(ram, count);
     }
 
-    /** Hook for allocation logic, e.g. computing base addresses or checking for overlaps. */
-    protected void onGenerate(long ramBytes, int segmentCount) {
-    }
-
-    /** The segment table model, for the allocation logic. */
+    /** The generated segment table model. */
     public DefaultTableModel getSegmentModel() {
         return tableModel;
     }
