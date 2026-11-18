@@ -10,10 +10,9 @@ import java.util.List;
  * Module 1: CPU Scheduling.
  *
  * <p>Front end only. The user edits Arrival, Burst and Priority in one table and presses Run;
- * the panel validates the input and calls {@link #onSchedule}. The back end overrides that hook,
- * computes the schedule and hands it to {@link #showResults}, which fills the read-only
- * Completion, Turnaround, Waiting and Response columns, the average-time calculations and the
- * Gantt chart. Until then the sample from the design issue is displayed.</p>
+ * the panel validates the input and calls {@link #onSchedule}. The scheduling engine computes the
+ * schedule and hands it to {@link #showResults}, which fills the read-only Completion,
+ * Turnaround, Waiting and Response columns, the average-time calculations and the Gantt chart.</p>
  */
 public class CPUSchedulingPanel extends JPanel {
     // Column layout of the process table: inputs first, computed results after.
@@ -149,7 +148,7 @@ public class CPUSchedulingPanel extends JPanel {
         showSample();
     }
 
-    /** Fills in the layout from the design issue (preemptive Priority) until the back end is connected. */
+    /** Displays the example schedule used by the initial panel design. */
     private void showSample() {
         List<GanttChart.Segment> gantt = new ArrayList<>();
         int[][] blocks = {{0, 0, 1}, {1, 1, 2}, {2, 2, 4}, {3, 4, 5}, {1, 5, 8}, {0, 8, 12}};
@@ -230,14 +229,25 @@ public class CPUSchedulingPanel extends JPanel {
         onSchedule(algorithm, preemptive, rrBtn.isSelected() ? quantum : null);
     }
 
-    /**
-     * BACK-END HOOK. Read the inputs from {@link #getProcessModel()} (columns: Process, Arrival,
-     * Burst, Priority), compute the schedule for {@code algorithm} ("FCFS", "SJF", "Priority" or
-     * "Round Robin"), then call {@link #showResults}. {@code preemptive} only applies to SJF and
-     * Priority; {@code quantum} is null unless Round Robin is selected.
-     */
+    /** Runs the selected algorithm using the process table and displays its results. */
     protected void onSchedule(String algorithm, boolean preemptive, Integer quantum) {
-        resultsSection.setHint(algorithm + " is not connected to the back end yet");
+        int processCount = tableModel.getRowCount();
+        int[] arrival = new int[processCount];
+        int[] burst = new int[processCount];
+        int[] priority = new int[processCount];
+        for (int row = 0; row < processCount; row++) {
+            arrival[row] = UIKit.intAt(tableModel, row, COL_ARRIVAL);
+            burst[row] = UIKit.intAt(tableModel, row, COL_BURST);
+            priority[row] = UIKit.intAt(tableModel, row, COL_PRIORITY);
+        }
+
+        CPUScheduler.Result result = CPUScheduler.run(
+                algorithm, preemptive, quantum == null ? 1 : quantum, arrival, burst, priority);
+        List<GanttChart.Segment> gantt = new ArrayList<>();
+        for (CPUScheduler.Segment segment : result.gantt) {
+            gantt.add(new GanttChart.Segment(segment.process, segment.start, segment.end));
+        }
+        showResults(result.completion, result.turnaround, result.waiting, result.response, gantt);
     }
 
     /**
