@@ -6,7 +6,7 @@ import java.awt.event.KeyEvent;
 /**
  * Main application window.
  * 
- * A top bar (title, module selector, light/dark button) sits above a CardLayout that holds the
+ * A top bar (title and module selector) sits above a CardLayout that holds the
  * welcome page and the eight simulator modules. Modules can be opened from the selector, the
  * welcome cards or Ctrl+0 to Ctrl+8.
  */
@@ -32,7 +32,6 @@ public class MainFrame extends JFrame {
     private final CardLayout cardLayout = new CardLayout();
     private final JPanel mainContainer = new JPanel(cardLayout);
     private final JComboBox<String> moduleSelector;
-    private final JButton themeButton = new JButton();
 
     /**
      * Builds the window: selector, menu bar, welcome page and one panel per module.
@@ -81,7 +80,7 @@ public class MainFrame extends JFrame {
         moduleSelector.setSelectedIndex(index);
     }
 
-    /** Top bar: app name on the left; module selector and theme button on the right. */
+    /** Top bar: app name on the left; module selector on the right. */
     private JComponent createTopBar() {
         JLabel appName = new JLabel("OS Simulator");
         UIKit.styleClass(appName, "h3", Font.BOLD, 1.25f);
@@ -91,18 +90,14 @@ public class MainFrame extends JFrame {
         selectorLabel.setLabelFor(moduleSelector);
         moduleSelector.setPreferredSize(new Dimension(230, moduleSelector.getPreferredSize().height));
 
-        themeButton.setEnabled(true);
-        themeButton.addActionListener(e -> toggleTheme());
-        updateThemeButton();
-
         JPanel bar = new JPanel(new BorderLayout(16, 0));
         bar.setBorder(new UIKit.BottomLineBorder(new Insets(10, 24, 10, 24)));
         bar.add(brand, BorderLayout.WEST);
-        bar.add(UIKit.row(selectorLabel, moduleSelector, themeButton), BorderLayout.EAST);
+        bar.add(UIKit.row(selectorLabel, moduleSelector), BorderLayout.EAST);
         return bar;
     }
 
-    /** Menu bar with File (Exit), View (theme toggle) and Modules (Ctrl+0 to Ctrl+8 shortcuts). */
+    /** Menu bar with File (Exit) and Modules (Ctrl+0 to Ctrl+8 shortcuts). */
     private JMenuBar createMenuBar() {
         int shortcut = InputEvent.CTRL_DOWN_MASK;
         JMenuBar menuBar = new JMenuBar();
@@ -113,14 +108,6 @@ public class MainFrame extends JFrame {
         exit.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_Q, shortcut));
         exit.addActionListener(e -> dispose());
         file.add(exit);
-
-        JMenu view = new JMenu("View");
-        view.setMnemonic(KeyEvent.VK_V);
-        JMenuItem toggleTheme = new JMenuItem("Toggle light / dark theme");
-        toggleTheme.setAccelerator(KeyStroke.getKeyStroke(KeyEvent.VK_T, shortcut));
-        toggleTheme.setEnabled(true);
-        toggleTheme.addActionListener(e -> toggleTheme());
-        view.add(toggleTheme);
 
         JMenu modules = new JMenu("Modules");
         modules.setMnemonic(KeyEvent.VK_M);
@@ -136,21 +123,8 @@ public class MainFrame extends JFrame {
         }
 
         menuBar.add(file);
-        menuBar.add(view);
         menuBar.add(modules);
         return menuBar;
-    }
-
-    /** Switches between light and dark and refreshes the button label. */
-    private void toggleTheme() {
-        Theme.toggle(this);
-        updateThemeButton();
-    }
-
-    /** The button names the theme it will switch TO ("Light mode" while dark). */
-    private void updateThemeButton() {
-        themeButton.setText(Theme.isDark() ? "Light mode" : "Dark mode");
-        themeButton.setToolTipText("Switch theme (Ctrl+T)");
     }
 
     /** Welcome page: heading, a grid of clickable module cards and a shortcut tip. */
