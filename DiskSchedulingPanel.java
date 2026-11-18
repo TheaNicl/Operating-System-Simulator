@@ -129,7 +129,103 @@ public class DiskSchedulingPanel extends JPanel {
      */
     protected int[] computeServiceOrder(String algorithm, int head, int[] requests, int diskSize,
                                         boolean towardHigher) {
-        return null;
+        if ("FCFS".equals(algorithm)) {
+            int[] order = new int[requests.length + 1];
+            order[0] = head;
+            System.arraycopy(requests, 0, order, 1, requests.length);
+            return order;
+        }
+
+        if ("SSTF".equals(algorithm)) {
+            java.util.ArrayList<Integer> remaining = new java.util.ArrayList<>();
+            for (int request : requests) remaining.add(request);
+            java.util.ArrayList<Integer> order = new java.util.ArrayList<>();
+            order.add(head);
+            int current = head;
+            while (!remaining.isEmpty()) {
+                int closestIndex = 0;
+                for (int i = 1; i < remaining.size(); i++) {
+                    int candidateDistance = Math.abs(remaining.get(i) - current);
+                    int closestDistance = Math.abs(remaining.get(closestIndex) - current);
+                    if (candidateDistance < closestDistance) {
+                        closestIndex = i;
+                    }
+                }
+                current = remaining.remove(closestIndex);
+                order.add(current);
+            }
+            int[] result = new int[order.size()];
+            for (int i = 0; i < order.size(); i++) result[i] = order.get(i);
+            return result;
+        }
+
+        java.util.ArrayList<Integer> lower = new java.util.ArrayList<>();
+        java.util.ArrayList<Integer> higher = new java.util.ArrayList<>();
+        for (int request : requests) {
+            if (request < head) lower.add(request);
+            else if (request > head) higher.add(request);
+        }
+        java.util.Collections.sort(lower);
+        java.util.Collections.sort(higher);
+
+        java.util.ArrayList<Integer> order = new java.util.ArrayList<>();
+        order.add(head);
+
+        if ("LOOK".equals(algorithm)) {
+            if (towardHigher) {
+                for (int request : higher) order.add(request);
+                for (int i = lower.size() - 1; i >= 0; i--) order.add(lower.get(i));
+            } else {
+                for (int i = lower.size() - 1; i >= 0; i--) order.add(lower.get(i));
+                for (int request : higher) order.add(request);
+            }
+        } else if ("C-LOOK".equals(algorithm)) {
+            if (towardHigher) {
+                for (int request : higher) order.add(request);
+                if (!lower.isEmpty()) {
+                    for (int request : lower) order.add(request);
+                }
+            } else {
+                for (int i = lower.size() - 1; i >= 0; i--) order.add(lower.get(i));
+                if (!higher.isEmpty()) {
+                    for (int i = higher.size() - 1; i >= 0; i--) order.add(higher.get(i));
+                }
+            }
+        } else if ("SCAN".equals(algorithm)) {
+            if (towardHigher) {
+                for (int request : higher) order.add(request);
+                addTrack(order, diskSize - 1);
+                for (int i = lower.size() - 1; i >= 0; i--) order.add(lower.get(i));
+            } else {
+                for (int i = lower.size() - 1; i >= 0; i--) order.add(lower.get(i));
+                addTrack(order, 0);
+                for (int request : higher) order.add(request);
+            }
+        } else if ("C-SCAN".equals(algorithm)) {
+            if (towardHigher) {
+                for (int request : higher) order.add(request);
+                addTrack(order, diskSize - 1);
+                addTrack(order, 0);
+                for (int request : lower) order.add(request);
+            } else {
+                for (int i = lower.size() - 1; i >= 0; i--) order.add(lower.get(i));
+                addTrack(order, 0);
+                addTrack(order, diskSize - 1);
+                for (int i = higher.size() - 1; i >= 0; i--) order.add(higher.get(i));
+            }
+        } else {
+            return null;
+        }
+
+        int[] result = new int[order.size()];
+        for (int i = 0; i < order.size(); i++) result[i] = order.get(i);
+        return result;
+    }
+
+    private static void addTrack(java.util.ArrayList<Integer> order, int track) {
+        if (order.isEmpty() || order.get(order.size() - 1) != track) {
+            order.add(track);
+        }
     }
 
     /** Fills the table with every seek, updates the totals and redraws the chart. */
