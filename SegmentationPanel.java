@@ -1,23 +1,30 @@
 import java.awt.*;
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
+import java.util.ArrayList;
+import java.util.Comparator;
+import java.util.List;
 
 /**
  * Module 5: Segmentation.
  *
- * The user enters each segment's name, base address and limit in a table, then validates the
- * physical ranges against the configured RAM size.
+ * The user enters each segment's name, base address and limit in a table. A successful validation
+ * draws the occupied and free physical-memory ranges beside the input table.
  */
 public class SegmentationPanel extends JPanel {
     private static final int MAX_SEGMENTS = 32;
+    private static final long DEFAULT_MAP_CHUNK_BYTES = 4L * 1024 * 1024 * 1024;
+    private static final int MAX_MAP_CHUNKS = 1024;
 
-    // RAM configuration and the editable segment table.
+    // RAM configuration, editable inputs and the read-only physical map.
     private final JTextField ramSizeField;
     private final DefaultTableModel tableModel;
     private final JTable segTable;
     private final UIKit.Section tableSection;
+    private final DefaultTableModel mapModel;
+    private final UIKit.Section mapSection;
 
-    /** Builds the RAM configuration card and editable segment table. */
+    /** Builds the RAM configuration card, editable segment table and physical-memory map. */
     public SegmentationPanel() {
         UIKit.setupModule(this);
         add(UIKit.header("Segmentation",
@@ -51,9 +58,14 @@ public class SegmentationPanel extends JPanel {
         tableBody.add(UIKit.row(addBtn, removeBtn), BorderLayout.SOUTH);
         tableSection = new UIKit.Section("Segment Table", "Enter each segment, then press Run", tableBody);
 
+        mapModel = UIKit.model(new String[]{"Address Range", "Allocation", "Size"}, false);
+        JTable mapTable = UIKit.table(mapModel);
+        mapSection = new UIKit.Section("Physical Memory Map", "Run to draw the validated layout",
+                UIKit.scroll(mapTable));
+
         JPanel center = UIKit.transparent(new BorderLayout(0, 16));
         center.add(new UIKit.Section("Configuration", configBody), BorderLayout.NORTH);
-        center.add(tableSection, BorderLayout.CENTER);
+        center.add(UIKit.split(JSplitPane.HORIZONTAL_SPLIT, tableSection, mapSection, 0.5), BorderLayout.CENTER);
         add(center, BorderLayout.CENTER);
     }
 
@@ -84,6 +96,7 @@ public class SegmentationPanel extends JPanel {
         }
 
         long[][] ranges = new long[tableModel.getRowCount()][2];
+        List<SegmentRange> segments = new ArrayList<>();
         for (int row = 0; row < tableModel.getRowCount(); row++) {
             Object nameValue = tableModel.getValueAt(row, 1);
             if (nameValue == null || nameValue.toString().trim().isEmpty()) {
@@ -113,9 +126,66 @@ public class SegmentationPanel extends JPanel {
             }
             ranges[row][0] = base;
             ranges[row][1] = end;
+            segments.add(new SegmentRange(row, nameValue.toString().trim(), base, end));
         }
+        drawMemoryMap(ram, segments);
         tableSection.setHint(tableModel.getRowCount() + " segments validated; values converted to bytes \u00b7 RAM "
                 + UIKit.formatSize(ram));
+    }
+
+    private void drawMemoryMap(long ram, List<SegmentRange> segments) {
+        segments.sort(Comparator.comparingLong(segment -> segment.base));
+        long chunkBytes = chooseMapChunkSize(ram);
+        mapModel.setRowCount(0);
+
+        long cursor = 0;
+        for (SegmentRange segment : segments) {
+            if (segment.base > cursor) {
+                addMapRows(cursor, segment.base, "Free", chunkBytes);
+            }
+            addMapRows(segment.base, segment.end,
+                    "Segment " + segment.number + " (" + segment.name + ")", chunkBytes);
+            cursor = segment.end;
+        }
+        if (cursor < ram) {
+            addMapRows(cursor, ram, "Free", chunkBytes);
+        }
+        mapSection.setHint(mapModel.getRowCount() + " address ranges \u00b7 " + UIKit.formatSize(ram));
+    }
+
+    private long chooseMapChunkSize(long ram) {
+        long chunkBytes = DEFAULT_MAP_CHUNK_BYTES;
+        // Keep large maps bounded; exact segment boundaries are added independently.
+        while ((ram - 1) / chunkBytes + 1 > MAX_MAP_CHUNKS) {
+            chunkBytes *= 2;
+        }
+        return chunkBytes;
+    }
+
+    private void addMapRows(long start, long end, String allocation, long chunkBytes) {
+        long address = start;
+        while (address < end) {
+            long distanceToChunk = chunkBytes - address % chunkBytes;
+            long remaining = end - address;
+            long nextAddress = remaining <= distanceToChunk ? end : address + distanceToChunk;
+            mapModel.addRow(new Object[]{
+                    formatRange(address, nextAddress),
+                    allocation,
+                    UIKit.formatSize(nextAddress - address)
+            });
+            address = nextAddress;
+        }
+    }
+
+    private String formatRange(long start, long end) {
+        String startLabel;
+        if (start == 0) {
+            String endLabel = UIKit.formatSize(end);
+            startLabel = "0 " + endLabel.substring(endLabel.lastIndexOf(' ') + 1);
+        } else {
+            startLabel = UIKit.formatSize(start);
+        }
+        return startLabel + " - " + UIKit.formatSize(end);
     }
 
     private Long parseTableSize(int row, int column) {
@@ -141,8 +211,27 @@ public class SegmentationPanel extends JPanel {
         return tableModel;
     }
 
+    /** The read-only physical-memory map generated by a successful run. */
+    public DefaultTableModel getMemoryMapModel() {
+        return mapModel;
+    }
+
     private Object[] getNewSegment(int index) {
         String segmentName = "Segment " + index;
         return new Object[]{String.valueOf(index), segmentName, 0, 100};
+    }
+
+    private static final class SegmentRange {
+        private final int number;
+        private final String name;
+        private final long base;
+        private final long end;
+
+        private SegmentRange(int number, String name, long base, long end) {
+            this.number = number;
+            this.name = name;
+            this.base = base;
+            this.end = end;
+        }
     }
 }
