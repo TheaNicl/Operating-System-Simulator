@@ -74,7 +74,7 @@ public class PageReplacementPanel extends JPanel {
                 BorderLayout.SOUTH);
 
         traceModel = UIKit.model(new String[]{"Ref", "-", "-", "-", "-", "-", "-", "-"}, false);
-        traceTable = UIKit.table(traceModel);
+        traceTable = UIKit.table(new FrameTraceTable(traceModel));
         traceTable.setDefaultRenderer(Object.class, new StatusRenderer());
         traceTable.setRowSelectionAllowed(false);
 
@@ -422,6 +422,42 @@ public class PageReplacementPanel extends JPanel {
                     i,
                     step + 1
             );
+        }
+    }
+
+    /** Fills the viewport when columns fit and keeps their natural widths when they don't. */
+    private static final class FrameTraceTable extends JTable {
+        private boolean fillsViewport;
+
+        FrameTraceTable(DefaultTableModel model) {
+            super(model);
+        }
+
+        @Override
+        public boolean getScrollableTracksViewportWidth() {
+            Container parent = getParent();
+            if (!(parent instanceof JViewport)) {
+                return true;
+            }
+
+            int preferredWidth = 0;
+            for (int column = 0; column < getColumnCount(); column++) {
+                preferredWidth += getColumnModel().getColumn(column).getPreferredWidth();
+            }
+            boolean shouldFill = preferredWidth <= parent.getWidth();
+            if (shouldFill != fillsViewport) {
+                fillsViewport = shouldFill;
+                if (shouldFill) {
+                    setAutoResizeMode(JTable.AUTO_RESIZE_ALL_COLUMNS);
+                } else {
+                    setAutoResizeMode(JTable.AUTO_RESIZE_OFF);
+                    for (int column = 0; column < getColumnCount(); column++) {
+                        getColumnModel().getColumn(column).setWidth(
+                                getColumnModel().getColumn(column).getPreferredWidth());
+                    }
+                }
+            }
+            return shouldFill;
         }
     }
 
