@@ -259,7 +259,11 @@ public final class UIKit {
 
     /** Styled table: row height, centred cells, single-line rows and no column reordering. */
     public static JTable table(DefaultTableModel model) {
-        JTable table = new JTable(model);
+        return table(new JTable(model));
+    }
+
+    /** Applies the standard table styling to an existing table. */
+    public static JTable table(JTable table) {
         table.setRowHeight(30);
         table.setFillsViewportHeight(true);
         table.setShowVerticalLines(false);
