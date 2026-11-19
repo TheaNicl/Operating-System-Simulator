@@ -25,9 +25,9 @@ public class BankersPanel extends JPanel {
     private final JTextField availBField;
     private final JTextField availCField;
 
-    // Output: table with Allocation / Max / Need / Work and the safe sequence line
+    // Output: table with Allocation / Max / Need / Work and the safe sequence
     private final DefaultTableModel outputModel;
-    private final JLabel safeSequenceLabel;
+    private final JTextArea safeSequenceText;
 
     public BankersPanel() {
         UIKit.setupModule(this);
@@ -85,13 +85,21 @@ public class BankersPanel extends JPanel {
         outputTable.getColumnModel().getColumn(0).setPreferredWidth(90);
         JScrollPane outputScroll = UIKit.scroll(outputTable);
 
-        safeSequenceLabel = new JLabel("Run the check to compute a safe sequence.");
-        UIKit.styleClass(safeSequenceLabel, "h4", Font.BOLD, 1.1f);
+        safeSequenceText = new JTextArea("Run the check to compute a safe sequence.", 2, 20);
+        safeSequenceText.setEditable(false);
+        safeSequenceText.setLineWrap(true);
+        safeSequenceText.setWrapStyleWord(true);
+        safeSequenceText.setOpaque(false);
+        UIKit.styleClass(safeSequenceText, "h4", Font.BOLD, 1.1f);
+        JScrollPane sequenceScroll = UIKit.scroll(safeSequenceText);
+        sequenceScroll.setHorizontalScrollBarPolicy(ScrollPaneConstants.HORIZONTAL_SCROLLBAR_NEVER);
+        sequenceScroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);
+        sequenceScroll.setBorder(BorderFactory.createEmptyBorder());
 
         JPanel resultBody = UIKit.transparent(new BorderLayout(0, 12));
         resultBody.add(UIKit.toolbar(availRow, calcBtn), BorderLayout.NORTH);
         resultBody.add(outputScroll, BorderLayout.CENTER);
-        resultBody.add(safeSequenceLabel, BorderLayout.SOUTH);
+        resultBody.add(sequenceScroll, BorderLayout.SOUTH);
         UIKit.Section resultSection = new UIKit.Section("Available Resources & Result",
                 "Work = resources available when the process runs", resultBody);
 
@@ -259,11 +267,12 @@ public class BankersPanel extends JPanel {
             outputModel.addRow(outputRow);
         }
         if (safeSequence != null) {
-            safeSequenceLabel.setText("SAFE SEQUENCE:  " + String.join("  \u2192  ", safeSequence));
-            safeSequenceLabel.setForeground(Theme.SUCCESS);
+            safeSequenceText.setText("SAFE SEQUENCE:  " + String.join("  \u2192  ", safeSequence));
+            safeSequenceText.setForeground(Theme.SUCCESS);
         } else {
-            safeSequenceLabel.setText("Unsafe state: no sequence lets every process finish.");
-            safeSequenceLabel.setForeground(Theme.DANGER);
+            safeSequenceText.setText("Unsafe state: no sequence lets every process finish.");
+            safeSequenceText.setForeground(Theme.DANGER);
         }
+        safeSequenceText.setCaretPosition(0);
     }
 }
