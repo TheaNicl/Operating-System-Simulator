@@ -25,6 +25,8 @@ public class PagingPanel extends JPanel {
     private final JLabel pagesInfo = new JLabel();
     private final JPopupMenu framesPopup = new JPopupMenu();
     private final JLabel framesInfo = new JLabel();
+    private final JPopupMenu physicalPopup = new JPopupMenu();
+    private final JLabel physicalInfo = new JLabel();
 
     // Result tiles: page count, frame count, page/offset split and the physical address.
     private final UIKit.Stat pagesStat = new UIKit.Stat("Pages (logical)", "—");
@@ -87,6 +89,8 @@ public class PagingPanel extends JPanel {
         pagesPopup.add(pagesInfo);
         framesInfo.setBorder(BorderFactory.createEmptyBorder(8, 10, 8, 10));
         framesPopup.add(framesInfo);
+        physicalInfo.setBorder(BorderFactory.createEmptyBorder(8, 10, 8, 10));
+        physicalPopup.add(physicalInfo);
 
         pagesStat.addMouseListener(new MouseAdapter() {
             @Override
@@ -109,6 +113,18 @@ public class PagingPanel extends JPanel {
             @Override
             public void mouseExited(MouseEvent e) {
                 framesPopup.setVisible(false);
+            }
+        });
+
+        physicalStat.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseEntered(MouseEvent e) {
+                physicalPopup.show(physicalStat, 30, physicalStat.getHeight());
+            }
+
+            @Override
+            public void mouseExited(MouseEvent e) {
+                physicalPopup.setVisible(false);
             }
         });
 
@@ -180,6 +196,7 @@ public class PagingPanel extends JPanel {
             }
         }
         if (pageRow < 0) {
+            physicalInfo.setText("");
             physicalStat.setValue("Page fault", Theme.DANGER);
             return;
         }
@@ -199,7 +216,9 @@ public class PagingPanel extends JPanel {
         }
 
         pageTable.changeSelection(pageRow, 1, false, false);
-        physicalStat.setValue(String.format("%,d", frame * pageSize + offset), Theme.SUCCESS);
+        long physicalAddress = frame * pageSize + offset;
+        physicalInfo.setText(getByteFormat(physicalAddress));
+        physicalStat.setValue(String.format("%,d", physicalAddress), Theme.SUCCESS);
     }
 
     /**
@@ -212,12 +231,14 @@ public class PagingPanel extends JPanel {
         framesStat.setValue(String.format("%,d", frames));
         pageOffsetStat.setValue(page + " / " + offset);
         if (physicalAddress == null) {
+            physicalInfo.setText("");
             physicalStat.setValue("Page fault", Theme.DANGER);
             return;
         }
         if (page < pageTable.getRowCount()) {
             pageTable.changeSelection((int) page, 1, false, false);
         }
+        physicalInfo.setText(getByteFormat(physicalAddress));
         physicalStat.setValue(String.format("%,d", physicalAddress), Theme.SUCCESS);
     }
 
@@ -245,9 +266,11 @@ public class PagingPanel extends JPanel {
     public String getByteFormat(double bytes) {
         StringBuilder info = new StringBuilder("<html>");
 
-        info.append("<b>Base 2:</b> 2<sup>")
-                .append(getBaseTwo(bytes))
-                .append("</sup><br>");
+        if (bytes > 0) {
+            info.append("<b>Base 2:</b> 2<sup>")
+                    .append(getBaseTwo(bytes))
+                    .append("</sup><br>");
+        }
 
         info.append("<b>Bytes:</b> ")
                 .append(String.format("%,d", (long) bytes))
