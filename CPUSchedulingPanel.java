@@ -25,6 +25,7 @@ public class CPUSchedulingPanel extends JPanel {
     private static final int COL_AVERAGES = 8;   // merged "Avg. Time Calculations" column (no model data)
     private static final int INPUT_COLUMNS = 4;
     private static final int ROW_HEIGHT = 36;
+    private static final int SINGLE_RESULT_ROW_HEIGHT = 90;
     private static final int MAX_VISIBLE_ROWS = 8;
     private static final String NO_RESULT = "";
 
@@ -281,6 +282,8 @@ public class CPUSchedulingPanel extends JPanel {
                 + " = " + averageFormat.format(avgWaiting);
         turnaroundText = "Average Turnaround Time<br>= (" + joinSum(turnaround) + ")/" + n
                 + " = " + averageFormat.format(avgTurnaround);
+        processTable.setRowHeight(n == 1 ? SINGLE_RESULT_ROW_HEIGHT : ROW_HEIGHT);
+        resizeTable();
         processTable.repaint();
 
         ganttChart.setSchedule(gantt, names);
@@ -310,6 +313,8 @@ public class CPUSchedulingPanel extends JPanel {
         }
         waitingText = "";
         turnaroundText = "";
+        processTable.setRowHeight(ROW_HEIGHT);
+        resizeTable();
         processTable.repaint();
         ganttArea.removeAll();
         ganttArea.add(emptyGantt, BorderLayout.CENTER);
@@ -342,7 +347,7 @@ public class CPUSchedulingPanel extends JPanel {
     private void resizeTable() {
         int rows = Math.min(Math.max(tableModel.getRowCount(), 1), MAX_VISIBLE_ROWS);
         int header = processTable.getTableHeader().getPreferredSize().height;
-        tableScroll.setPreferredSize(new Dimension(0, header + rows * ROW_HEIGHT + 6));
+        tableScroll.setPreferredSize(new Dimension(0, header + rows * processTable.getRowHeight() + 6));
         tableScroll.revalidate();
     }
 
@@ -392,7 +397,7 @@ public class CPUSchedulingPanel extends JPanel {
         protected void paintComponent(Graphics g) {
             int width = getWidth();
             int height = getHeight();
-            boolean split = rows >= 4;
+            boolean split = rows >= 2;
             int middle = (rows + 1) / 2;
             int blockStart = !split || row < middle ? 0 : middle;
             int blockEnd = !split ? rows : (row < middle ? middle : rows);
