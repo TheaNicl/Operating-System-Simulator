@@ -14,8 +14,7 @@ import java.util.List;
  * log on the right.
  */
 public class MultiprogrammingPanel extends JPanel {
-    private static final double COMPLETION_EPSILON = 1.0e-9;
-    private final DecimalFormat numberFormat = new DecimalFormat("0.##");
+    private final DecimalFormat numberFormat = new DecimalFormat("0.################");
 
     // Editable job queue and the read-only execution log.
     private final DefaultTableModel jobModel;
@@ -75,30 +74,36 @@ public class MultiprogrammingPanel extends JPanel {
             UIKit.error(this, "Add at least one job before running the simulation.");
             return;
         }
-        if (!UIKit.validateNumericTable(jobTable, 1, "Job queue", this)) {
-            return;
-        }
+        UIKit.stopEditing(jobTable);
         for (int row = 0; row < jobModel.getRowCount(); row++) {
+            double arrival;
             try {
-                Long.parseLong(jobModel.getValueAt(row, 1).toString().trim());
+                arrival = Double.parseDouble(jobModel.getValueAt(row, 1).toString().trim());
             } catch (NumberFormatException e) {
                 jobTable.changeSelection(row, 1, false, false);
-                UIKit.error(this, "Job queue: times must be whole numbers no greater than "
-                        + Long.MAX_VALUE + ".");
+                UIKit.error(this, "Job queue: row " + (row + 1)
+                        + ", \"Arrival Time\" must be a finite number greater than or equal to 0.");
                 return;
             }
-            long burst;
+            if (Double.isNaN(arrival) || Double.isInfinite(arrival) || arrival < 0) {
+                jobTable.changeSelection(row, 1, false, false);
+                UIKit.error(this, "Job queue: row " + (row + 1)
+                        + ", \"Arrival Time\" must be a finite number greater than or equal to 0.");
+                return;
+            }
+            double burst;
             try {
-                burst = Long.parseLong(jobModel.getValueAt(row, 2).toString().trim());
+                burst = Double.parseDouble(jobModel.getValueAt(row, 2).toString().trim());
             } catch (NumberFormatException e) {
                 jobTable.changeSelection(row, 2, false, false);
-                UIKit.error(this, "Job queue: times must be whole numbers no greater than "
-                        + Long.MAX_VALUE + ".");
+                UIKit.error(this, "Job queue: row " + (row + 1)
+                        + ", \"Burst Time\" must be a finite number greater than 0.");
                 return;
             }
-            if (burst < 1) {
+            if (Double.isNaN(burst) || Double.isInfinite(burst) || burst <= 0) {
                 jobTable.changeSelection(row, 2, false, false);
-                UIKit.error(this, "Job queue: row " + (row + 1) + ", \"Burst Time\" must be at least 1.");
+                UIKit.error(this, "Job queue: row " + (row + 1)
+                        + ", \"Burst Time\" must be a finite number greater than 0.");
                 return;
             }
         }
@@ -116,10 +121,10 @@ public class MultiprogrammingPanel extends JPanel {
         List<Job> waiting = new ArrayList<>();
         for (int row = 0; row < jobs.getRowCount(); row++) {
             waiting.add(new Job(String.valueOf(jobs.getValueAt(row, 0)),
-                    Long.parseLong(jobs.getValueAt(row, 1).toString().trim()),
-                    Long.parseLong(jobs.getValueAt(row, 2).toString().trim()), row));
+                    Double.parseDouble(jobs.getValueAt(row, 1).toString().trim()),
+                    Double.parseDouble(jobs.getValueAt(row, 2).toString().trim()), row));
         }
-        waiting.sort(Comparator.comparingLong((Job job) -> job.arrival).thenComparingInt(job -> job.order));
+        waiting.sort(Comparator.comparingDouble((Job job) -> job.arrival).thenComparingInt(job -> job.order));
 
         List<Job> active = new ArrayList<>();
         int nextArrival = 0;
@@ -127,8 +132,8 @@ public class MultiprogrammingPanel extends JPanel {
 
         while (nextArrival < waiting.size() || !active.isEmpty()) {
             double nextCompletion = Double.POSITIVE_INFINITY;
+            double leastRemaining = Double.POSITIVE_INFINITY;
             if (!active.isEmpty()) {
-                double leastRemaining = Double.POSITIVE_INFINITY;
                 for (Job job : active) {
                     leastRemaining = Math.min(leastRemaining, job.remaining);
                 }
@@ -136,13 +141,18 @@ public class MultiprogrammingPanel extends JPanel {
             }
             double nextArrivalTime = nextArrival < waiting.size()
                     ? waiting.get(nextArrival).arrival : Double.POSITIVE_INFINITY;
-            boolean simultaneousEvents = Math.abs(nextArrivalTime - nextCompletion) <= COMPLETION_EPSILON;
+            boolean simultaneousEvents = nearlyEqual(nextArrivalTime, nextCompletion);
+            boolean completionDue = nextCompletion < nextArrivalTime || simultaneousEvents;
             double eventTime = simultaneousEvents ? nextArrivalTime : Math.min(nextArrivalTime, nextCompletion);
 
             if (!active.isEmpty()) {
                 double servicePerJob = (eventTime - time) / active.size();
                 for (Job job : active) {
-                    job.remaining = Math.max(0, job.remaining - servicePerJob);
+                    if (completionDue && job.remaining == leastRemaining) {
+                        job.remaining = 0;
+                    } else {
+                        job.remaining = Math.max(0, job.remaining - servicePerJob);
+                    }
                 }
             }
             time = eventTime;
@@ -150,7 +160,7 @@ public class MultiprogrammingPanel extends JPanel {
             List<Job> completed = new ArrayList<>();
             for (int i = 0; i < active.size();) {
                 Job job = active.get(i);
-                if (job.remaining <= COMPLETION_EPSILON) {
+                if (job.remaining <= 0) {
                     active.remove(i);
                     completed.add(job);
                 } else {
@@ -168,6 +178,14 @@ public class MultiprogrammingPanel extends JPanel {
             }
         }
         logSection.setHint(waiting.size() + " jobs · equal-share CPU simulation complete");
+    }
+
+    private static boolean nearlyEqual(double first, double second) {
+        if (Double.isInfinite(first) || Double.isInfinite(second) || Double.isNaN(first) || Double.isNaN(second)) {
+            return false;
+        }
+        double tolerance = 4 * Math.max(Math.ulp(first), Math.ulp(second));
+        return Math.abs(first - second) <= tolerance;
     }
 
     private void appendEvent(double time, String event, List<Job> active) {
@@ -191,11 +209,11 @@ public class MultiprogrammingPanel extends JPanel {
 
     private static final class Job {
         private final String name;
-        private final long arrival;
+        private final double arrival;
         private final int order;
         private double remaining;
 
-        private Job(String name, long arrival, long burst, int order) {
+        private Job(String name, double arrival, double burst, int order) {
             this.name = name;
             this.arrival = arrival;
             this.order = order;
