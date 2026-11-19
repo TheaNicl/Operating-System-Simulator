@@ -171,6 +171,35 @@ public class PagingPanel extends JPanel {
         framesInfo.setText(getByteFormat(frames));
 
         pageOffsetStat.setValue(page + " / " + offset);
+
+        int pageRow = -1;
+        for (int row = 0; row < tableModel.getRowCount(); row++) {
+            if (String.valueOf(page).equals(tableModel.getValueAt(row, 0).toString().trim())) {
+                pageRow = row;
+                break;
+            }
+        }
+        if (pageRow < 0) {
+            physicalStat.setValue("Page fault", Theme.DANGER);
+            return;
+        }
+
+        long frame;
+        try {
+            frame = Long.parseLong(tableModel.getValueAt(pageRow, 1).toString().trim());
+        } catch (NumberFormatException e) {
+            pageTable.changeSelection(pageRow, 1, false, false);
+            UIKit.error(this, "Frame number in the page table is too large.");
+            return;
+        }
+        if (frame >= frames) {
+            pageTable.changeSelection(pageRow, 1, false, false);
+            UIKit.error(this, "Frame number must be between 0 and " + (frames - 1) + ".");
+            return;
+        }
+
+        pageTable.changeSelection(pageRow, 1, false, false);
+        physicalStat.setValue(String.format("%,d", frame * pageSize + offset), Theme.SUCCESS);
     }
 
     /**
