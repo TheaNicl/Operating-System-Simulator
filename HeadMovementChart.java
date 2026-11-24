@@ -13,8 +13,8 @@ public class HeadMovementChart extends JComponent {
     private static final int PAD_BOTTOM = 16;
 
     // Visited tracks in order, the highest track on the axis, and animation progress (in segments).
-    private int[] sequence = new int[0];
-    private int maxTrack = 199;
+    private double[] sequence = new double[0];
+    private double maxTrack = 199;
     private float progress;
     private final Timer timer;
 
@@ -33,7 +33,7 @@ public class HeadMovementChart extends JComponent {
     }
 
     /** Shows a new head path. With {@code animate} the line is drawn progressively, otherwise at once. */
-    public void setSequence(int[] newSequence, int newMaxTrack, boolean animate) {
+    public void setSequence(double[] newSequence, double newMaxTrack, boolean animate) {
         timer.stop();
         sequence = newSequence.clone();
         maxTrack = Math.max(1, newMaxTrack);
@@ -43,6 +43,13 @@ public class HeadMovementChart extends JComponent {
             timer.start();
         }
         repaint();
+    }
+
+    /** Compatibility overload for whole-number track positions. */
+    public void setSequence(int[] newSequence, int newMaxTrack, boolean animate) {
+        double[] decimalSequence = new double[newSequence.length];
+        for (int i = 0; i < newSequence.length; i++) decimalSequence[i] = newSequence[i];
+        setSequence(decimalSequence, newMaxTrack, animate);
     }
 
     @Override
@@ -72,12 +79,12 @@ public class HeadMovementChart extends JComponent {
         g2.setColor(grid);
         g2.drawLine(PAD_LEFT, PAD_TOP, PAD_LEFT + width, PAD_TOP);
         for (int i = 0; i <= 4; i++) {
-            int track = Math.round(maxTrack * i / 4f);
+            double track = maxTrack * i / 4.0;
             int x = xFor(track, width);
             g2.setColor(grid);
             g2.drawLine(x, PAD_TOP - 4, x, PAD_TOP + height);
             g2.setColor(muted);
-            String label = String.valueOf(track);
+            String label = formatTrack(track);
             g2.drawString(label, x - metrics.stringWidth(label) / 2, PAD_TOP - 10);
         }
 
@@ -105,7 +112,7 @@ public class HeadMovementChart extends JComponent {
             g2.setColor(i == 0 ? Theme.SUCCESS : Theme.ACCENT);
             g2.fillOval((int) p.getX() - radius, (int) p.getY() - radius, radius * 2, radius * 2);
             g2.setColor(text);
-            String label = String.valueOf(sequence[i]);
+            String label = formatTrack(sequence[i]);
             boolean rightSide = p.getX() < PAD_LEFT + width - 40;
             int labelX = rightSide ? (int) p.getX() + 8 : (int) p.getX() - 8 - metrics.stringWidth(label);
             g2.drawString(label, labelX, (int) p.getY() + metrics.getAscent() / 2 - 1);
@@ -119,7 +126,11 @@ public class HeadMovementChart extends JComponent {
     }
 
     /** Converts a track number into an x pixel on the axis. */
-    private int xFor(int track, int width) {
-        return PAD_LEFT + Math.round(width * (track / (float) maxTrack));
+    private int xFor(double track, int width) {
+        return PAD_LEFT + (int) Math.round(width * (track / maxTrack));
+    }
+
+    private static String formatTrack(double track) {
+        return new java.text.DecimalFormat("0.##########").format(track);
     }
 }

@@ -29,7 +29,7 @@ public class PageReplacementPanel extends JPanel {
     private final UIKit.Stat ratioStat = new UIKit.Stat("Hit ratio", "-");
     private JButton runBtn;
     private Timer simulationTimer;
-    private int[] simulationReferences;
+    private String[] simulationReferences;
     private int simulationFrames;
     private int simulationFrame;
     private int simulationStep;
@@ -48,7 +48,7 @@ public class PageReplacementPanel extends JPanel {
         add(UIKit.header("Page Replacement",
                 "Trace how FIFO, LRU and Optimal fill frames for a page reference string."), BorderLayout.NORTH);
 
-        referenceField = UIKit.field("1, 3, 0, 3, 5, 6, 3", "e.g. 7, 0, 1, 2, 0", 24);
+        referenceField = UIKit.field("1, 3, 0, 3, 5, 6, 3", "e.g. A, B, page1, A", 24);
         framesField = UIKit.field("3", null, 4);
 
         fifoBtn = UIKit.option("FIFO", algorithmGroup);
@@ -106,16 +106,15 @@ public class PageReplacementPanel extends JPanel {
         return "FIFO";
     }
 
-    private int[] storedFrames;
+    private String[] storedFrames;
 
     private void run() {
-        int[] references = UIKit.parseIntList(referenceField, "Page reference string", 0, this);
+        String[] references = UIKit.parseStringList(referenceField, "Page reference string", this);
         if (references == null) return;
         Integer frames = UIKit.parseInt(framesField, "Frames", 1, 20, this);
         if (frames == null) return;
 
-        storedFrames = new int[frames];
-        Arrays.fill(storedFrames, -1);
+        storedFrames = new String[frames];
         fifoPointer = 0;
 
         setTableReferences(references);
@@ -135,7 +134,7 @@ public class PageReplacementPanel extends JPanel {
         onRun(selectedAlgorithm(), references, frames);
     }
 
-    protected void onRun(String algorithm, int[] references, int frames) {
+    protected void onRun(String algorithm, String[] references, int frames) {
         highlightedStep = -1;
         highlightedFrame = -1;
         traceTable.repaint();
@@ -181,10 +180,10 @@ public class PageReplacementPanel extends JPanel {
             return;
         }
 
-        int currRef = simulationReferences[simulationStep];
+        String currRef = simulationReferences[simulationStep];
 
         boolean hit;
-        int[] previousFrames = storedFrames.clone();
+        String[] previousFrames = storedFrames.clone();
 
         switch (simulationAlgorithm) {
             case "FIFO":
@@ -225,7 +224,7 @@ public class PageReplacementPanel extends JPanel {
 
         if (!hit) {
             for (int i = 0; i < simulationFrames; i++) {
-                if (previousFrames[i] != storedFrames[i]) {
+                if (!java.util.Objects.equals(previousFrames[i], storedFrames[i])) {
                     highlightedFrame = i;
                     break;
                 }
@@ -281,7 +280,7 @@ public class PageReplacementPanel extends JPanel {
         ratioStat.setValue(total == 0 ? "—" : String.format("%.1f%%", hits * 100.0 / total));
     }
 
-    private void setTableReferences(int[] references) {
+    private void setTableReferences(String[] references) {
         String[] refRow = new String[references.length + 1];
         refRow[0] = "Ref";
         for (int i = 0; i < references.length + 1; i++) {
@@ -289,16 +288,16 @@ public class PageReplacementPanel extends JPanel {
                 continue;
             }
 
-            refRow[i] = Integer.toString(references[i - 1]);
+            refRow[i] = references[i - 1];
         }
 
         traceModel.setColumnIdentifiers(refRow);
     }
 
-    private boolean fifoStep(int frames, int step, int currRef) {
+    private boolean fifoStep(int frames, int step, String currRef) {
         // Check for page hit
-        for (int f : storedFrames) {
-            if (f == currRef) {
+        for (String page : storedFrames) {
+            if (currRef.equals(page)) {
                 updateFrameTable(frames, step);
                 return true;
             }
@@ -319,10 +318,10 @@ public class PageReplacementPanel extends JPanel {
         return false;
     }
 
-    private boolean lruStep(int frames, int step, int currRef) {
+    private boolean lruStep(int frames, int step, String currRef) {
         // Check for page hit
         for (int i = 0; i < frames; i++) {
-            if (storedFrames[i] == currRef) {
+            if (currRef.equals(storedFrames[i])) {
                 lastUsed[i] = step;
 
                 updateFrameTable(frames, step);
@@ -354,10 +353,10 @@ public class PageReplacementPanel extends JPanel {
         return false;
     }
 
-    private boolean optimalStep(int frames, int step, int currRef) {
+    private boolean optimalStep(int frames, int step, String currRef) {
         // Check for page hit
-        for (int f : storedFrames) {
-            if (f == currRef) {
+        for (String page : storedFrames) {
+            if (currRef.equals(page)) {
                 updateFrameTable(frames, step);
                 return true;
             }
@@ -377,7 +376,7 @@ public class PageReplacementPanel extends JPanel {
                 int nextUse = Integer.MAX_VALUE;
 
                 for (int j = step + 1; j < simulationReferences.length; j++) {
-                    if (simulationReferences[j] == storedFrames[i]) {
+                    if (simulationReferences[j].equals(storedFrames[i])) {
                         nextUse = j;
                         break;
                     }
@@ -405,7 +404,7 @@ public class PageReplacementPanel extends JPanel {
 
     private int findEmptyFrame(int frames) {
         for (int i = 0; i < frames; i++) {
-            if (storedFrames[i] == -1) {
+            if (storedFrames[i] == null) {
                 return i;
             }
         }
@@ -416,7 +415,7 @@ public class PageReplacementPanel extends JPanel {
     private void updateFrameTable(int frames, int step) {
         for (int i = 0; i < frames; i++) {
             traceModel.setValueAt(
-                    storedFrames[i] == -1
+                    storedFrames[i] == null
                             ? "-"
                             : String.valueOf(storedFrames[i]),
                     i,

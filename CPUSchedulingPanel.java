@@ -29,7 +29,7 @@ public class CPUSchedulingPanel extends JPanel {
     private static final int MAX_VISIBLE_ROWS = 8;
     private static final String NO_RESULT = "";
 
-    private final DecimalFormat averageFormat = new DecimalFormat("0.##");
+    private final DecimalFormat averageFormat = new DecimalFormat("0.##########");
 
     // Process table (inputs + results)
     private final DefaultTableModel tableModel;
@@ -196,19 +196,19 @@ public class CPUSchedulingPanel extends JPanel {
             UIKit.error(this, "Add at least one process before running the scheduler.");
             return;
         }
-        if (!UIKit.validateNumericTable(processTable, COL_ARRIVAL, INPUT_COLUMNS, "Processes", this)) {
+        if (!UIKit.validateDecimalTable(processTable, COL_ARRIVAL, INPUT_COLUMNS, "Processes", this)) {
             return;
         }
         int n = tableModel.getRowCount();
         for (int row = 0; row < n; row++) {
-            if (UIKit.intAt(tableModel, row, COL_BURST) < 1) {
+            if (UIKit.doubleAt(tableModel, row, COL_BURST) <= 0) {
                 processTable.changeSelection(row, COL_BURST, false, false);
-                UIKit.error(this, "Processes: row " + (row + 1) + ", \"Burst Time\" must be at least 1.");
+                UIKit.error(this, "Processes: row " + (row + 1) + ", \"Burst Time\" must be greater than 0.");
                 return;
             }
         }
 
-        int quantum = 1;
+        double quantum = 1;
         if (rrBtn.isSelected()) {
             if (quantumField.getText().trim().isEmpty()) {
                 UIKit.markInvalid(quantumField, true);
@@ -218,8 +218,13 @@ public class CPUSchedulingPanel extends JPanel {
                 quantumField.requestFocusInWindow();
                 return;
             }
-            Integer parsed = UIKit.parseInt(quantumField, "Time quantum", 1, 1000, this);
+            Double parsed = UIKit.parseDouble(quantumField, "Time quantum", 0, 1000, this);
             if (parsed == null) {
+                return;
+            }
+            if (parsed <= 0) {
+                UIKit.markInvalid(quantumField, true);
+                UIKit.error(this, "Time quantum must be greater than 0.");
                 return;
             }
             quantum = parsed;
@@ -231,15 +236,15 @@ public class CPUSchedulingPanel extends JPanel {
     }
 
     /** Runs the selected algorithm using the process table and displays its results. */
-    protected void onSchedule(String algorithm, boolean preemptive, Integer quantum) {
+    protected void onSchedule(String algorithm, boolean preemptive, Double quantum) {
         int processCount = tableModel.getRowCount();
-        int[] arrival = new int[processCount];
-        int[] burst = new int[processCount];
-        int[] priority = new int[processCount];
+        double[] arrival = new double[processCount];
+        double[] burst = new double[processCount];
+        double[] priority = new double[processCount];
         for (int row = 0; row < processCount; row++) {
-            arrival[row] = UIKit.intAt(tableModel, row, COL_ARRIVAL);
-            burst[row] = UIKit.intAt(tableModel, row, COL_BURST);
-            priority[row] = UIKit.intAt(tableModel, row, COL_PRIORITY);
+            arrival[row] = UIKit.doubleAt(tableModel, row, COL_ARRIVAL);
+            burst[row] = UIKit.doubleAt(tableModel, row, COL_BURST);
+            priority[row] = UIKit.doubleAt(tableModel, row, COL_PRIORITY);
         }
 
         CPUScheduler.Result result = CPUScheduler.run(
@@ -257,7 +262,7 @@ public class CPUSchedulingPanel extends JPanel {
      *
      * @param gantt segments in time order; process = row index, or -1 for idle time
      */
-    public void showResults(int[] completion, int[] turnaround, int[] waiting, int[] response,
+    public void showResults(double[] completion, double[] turnaround, double[] waiting, double[] response,
                             List<GanttChart.Segment> gantt) {
         List<String> names = new ArrayList<>();
         for (int row = 0; row < tableModel.getRowCount(); row++) {
@@ -267,10 +272,10 @@ public class CPUSchedulingPanel extends JPanel {
         writingResults = true;
         try {
             for (int row = 0; row < n; row++) {
-                tableModel.setValueAt(String.valueOf(completion[row]), row, COL_COMPLETION);
-                tableModel.setValueAt(String.valueOf(turnaround[row]), row, COL_COMPLETION + 1);
-                tableModel.setValueAt(String.valueOf(waiting[row]), row, COL_COMPLETION + 2);
-                tableModel.setValueAt(String.valueOf(response[row]), row, COL_COMPLETION + 3);
+                tableModel.setValueAt(formatTime(completion[row]), row, COL_COMPLETION);
+                tableModel.setValueAt(formatTime(turnaround[row]), row, COL_COMPLETION + 1);
+                tableModel.setValueAt(formatTime(waiting[row]), row, COL_COMPLETION + 2);
+                tableModel.setValueAt(formatTime(response[row]), row, COL_COMPLETION + 3);
             }
         } finally {
             writingResults = false;
@@ -299,6 +304,20 @@ public class CPUSchedulingPanel extends JPanel {
         resultsSection.setHint(n + " processes");
     }
 
+    /** Compatibility overload for callers that provide whole-number results. */
+    public void showResults(int[] completion, int[] turnaround, int[] waiting, int[] response,
+                            List<GanttChart.Segment> gantt) {
+        showResults(toDoubles(completion), toDoubles(turnaround), toDoubles(waiting), toDoubles(response), gantt);
+    }
+
+    private static double[] toDoubles(int[] values) {
+        double[] converted = new double[values.length];
+        for (int i = 0; i < values.length; i++) {
+            converted[i] = values[i];
+        }
+        return converted;
+    }
+
     /** Resets result columns, averages and chart; used when the inputs change. */
     private void clearResults() {
         writingResults = true;
@@ -323,22 +342,27 @@ public class CPUSchedulingPanel extends JPanel {
         resultsSection.setHint("Double-click a cell to edit · results fill in after Run");
     }
 
-    private static double average(int[] values) {
-        int sum = 0;
-        for (int value : values) {
+    private static double average(double[] values) {
+        double sum = 0;
+        for (double value : values) {
             sum += value;
         }
-        return values.length == 0 ? 0 : (double) sum / values.length;
+        return values.length == 0 ? 0 : sum / values.length;
     }
 
-    /** "7+3+0+0" for the average formulas. */
-    private static String joinSum(int[] values) {
+    /** Formats a time without displaying trailing zeros or floating-point noise. */
+    private String formatTime(double value) {
+        return averageFormat.format(value);
+    }
+
+    /** Formats the values used in the average formulas. */
+    private String joinSum(double[] values) {
         StringBuilder text = new StringBuilder();
         for (int i = 0; i < values.length; i++) {
             if (i > 0) {
                 text.append('+');
             }
-            text.append(values[i]);
+            text.append(formatTime(values[i]));
         }
         return text.toString();
     }

@@ -7,7 +7,7 @@ import java.util.List;
  * <p>Supports FCFS, SJF, Priority and Round Robin. SJF and Priority can run either
  * non-preemptive or preemptive (SJF preemptive = shortest remaining time first).
  * For Priority, a <b>higher</b> priority number means a <b>higher</b> priority.
- * Time advances in whole units, so all inputs are integers.</p>
+ * Arrival, burst, priority and quantum values may be decimals.</p>
  */
 public final class CPUScheduler {
     private CPUScheduler() {}
@@ -15,10 +15,10 @@ public final class CPUScheduler {
     /** One continuous stretch of CPU time. {@code process} is the row index, or -1 when the CPU is idle. */
     public static final class Segment {
         public final int process;
-        public final int start;
-        public final int end;
+        public final double start;
+        public final double end;
 
-        Segment(int process, int start, int end) {
+        Segment(int process, double start, double end) {
             this.process = process;
             this.start = start;
             this.end = end;
@@ -27,17 +27,17 @@ public final class CPUScheduler {
 
     /** Per-process timings (indexed like the input arrays) plus the Gantt segments. */
     public static final class Result {
-        public final int[] completion;
-        public final int[] turnaround;
-        public final int[] waiting;
-        public final int[] response;
+        public final double[] completion;
+        public final double[] turnaround;
+        public final double[] waiting;
+        public final double[] response;
         public final List<Segment> gantt = new ArrayList<>();
 
         Result(int n) {
-            completion = new int[n];
-            turnaround = new int[n];
-            waiting = new int[n];
-            response = new int[n];
+            completion = new double[n];
+            turnaround = new double[n];
+            waiting = new double[n];
+            response = new double[n];
         }
 
         public double averageWaiting() {
@@ -48,12 +48,12 @@ public final class CPUScheduler {
             return average(turnaround);
         }
 
-        private static double average(int[] values) {
-            int sum = 0;
-            for (int value : values) {
+        private static double average(double[] values) {
+            double sum = 0;
+            for (double value : values) {
                 sum += value;
             }
-            return values.length == 0 ? 0 : (double) sum / values.length;
+            return values.length == 0 ? 0 : sum / values.length;
         }
     }
 
@@ -62,51 +62,75 @@ public final class CPUScheduler {
      *
      * @param algorithm  "FCFS", "SJF", "Priority" or "Round Robin"
      * @param preemptive only used by SJF and Priority
-     * @param quantum    only used by Round Robin (must be at least 1)
+     * @param quantum    only used by Round Robin (must be greater than 0)
      */
-    public static Result run(String algorithm, boolean preemptive, int quantum,
-                             int[] arrival, int[] burst, int[] priority) {
+    public static Result run(String algorithm, boolean preemptive, double quantum,
+                             double[] arrival, double[] burst, double[] priority) {
         if ("Round Robin".equals(algorithm)) {
             return roundRobin(quantum, arrival, burst);
         }
         return byPriority(algorithm, preemptive, arrival, burst, priority);
     }
 
+    /** Compatibility overload for callers that use whole-number scheduling inputs. */
+    public static Result run(String algorithm, boolean preemptive, int quantum,
+                             int[] arrival, int[] burst, int[] priority) {
+        double[] decimalArrival = new double[arrival.length];
+        double[] decimalBurst = new double[burst.length];
+        double[] decimalPriority = new double[priority.length];
+        for (int i = 0; i < arrival.length; i++) {
+            decimalArrival[i] = arrival[i];
+            decimalBurst[i] = burst[i];
+            decimalPriority[i] = priority[i];
+        }
+        return run(algorithm, preemptive, quantum, decimalArrival, decimalBurst, decimalPriority);
+    }
+
     // ------------------------------------------------- FCFS / SJF / Priority
 
-    /** Unit-by-unit simulation; a running process is only replaced when {@code preemptive} is true. */
+    /** Event-driven simulation; a running process is only replaced when {@code preemptive} is true. */
     private static Result byPriority(String algorithm, boolean preemptive,
-                                     int[] arrival, int[] burst, int[] priority) {
+                                     double[] arrival, double[] burst, double[] priority) {
         int n = arrival.length;
         Result result = new Result(n);
-        int[] remaining = burst.clone();
-        int[] firstStart = new int[n];
+        double[] remaining = burst.clone();
+        double[] firstStart = new double[n];
         java.util.Arrays.fill(firstStart, -1);
         boolean canPreempt = preemptive && !"FCFS".equals(algorithm);
 
-        int time = 0;
+        double time = 0;
         int finished = 0;
         int running = -1;
         while (finished < n) {
-            // A running process keeps the CPU unless preemption is allowed.
-            int chosen = (running >= 0 && !canPreempt) ? running
-                    : pick(algorithm, time, arrival, burst, remaining, priority);
-            if (chosen < 0) {
-                addSegment(result, -1, time, time + 1); // nothing has arrived yet: CPU idles
-                time++;
-                continue;
+            if (running < 0) {
+                running = pick(algorithm, time, arrival, remaining, priority);
+                if (running < 0) {
+                    // Nothing has arrived yet: the CPU idles until the next arrival.
+                    double next = nextArrival(arrival, remaining, time);
+                    addSegment(result, -1, time, next);
+                    time = next;
+                    continue;
+                }
+                if (firstStart[running] < 0) {
+                    firstStart[running] = time;
+                }
             }
-            if (firstStart[chosen] < 0) {
-                firstStart[chosen] = time;
-            }
-            running = chosen;
-            addSegment(result, chosen, time, time + 1);
-            time++;
-            remaining[chosen]--;
-            if (remaining[chosen] == 0) {
-                result.completion[chosen] = time;
+
+            // Run until the process finishes, or (when preemption is allowed) until the next arrival.
+            double finish = time + remaining[running];
+            double next = nextArrival(arrival, remaining, time);
+            double end = canPreempt && next < finish ? next : finish;
+            boolean completes = end == finish;
+            addSegment(result, running, time, end);
+            remaining[running] = completes ? 0 : finish - end;
+            time = end;
+
+            if (completes) {
+                result.completion[running] = time;
                 finished++;
                 running = -1;
+            } else if (canPreempt) {
+                running = -1; // Re-evaluate now that a new process has arrived.
             }
         }
         fillTimings(result, arrival, burst, firstStart);
@@ -114,12 +138,12 @@ public final class CPUScheduler {
     }
 
     /** Picks the best ready process for the algorithm, or -1 when none has arrived. */
-    private static int pick(String algorithm, int time, int[] arrival, int[] burst,
-                            int[] remaining, int[] priority) {
+    private static int pick(String algorithm, double time, double[] arrival, double[] remaining,
+                            double[] priority) {
         int best = -1;
         for (int i = 0; i < arrival.length; i++) {
             if (remaining[i] > 0 && arrival[i] <= time && (best < 0 || better(algorithm, i, best,
-                    arrival, burst, remaining, priority))) {
+                    arrival, remaining, priority))) {
                 best = i;
             }
         }
@@ -127,38 +151,40 @@ public final class CPUScheduler {
     }
 
     /** True when process {@code a} should run before {@code b}. Ties fall back to arrival, then row order. */
-    private static boolean better(String algorithm, int a, int b, int[] arrival, int[] burst,
-                                  int[] remaining, int[] priority) {
+    private static boolean better(String algorithm, int a, int b, double[] arrival,
+                                  double[] remaining, double[] priority) {
         int comparison = 0;
         if ("SJF".equals(algorithm)) {
-            comparison = Integer.compare(remaining[a], remaining[b]);
+            comparison = Double.compare(remaining[a], remaining[b]);
         } else if ("Priority".equals(algorithm)) {
-            comparison = Integer.compare(priority[b], priority[a]); // higher number first
+            comparison = Double.compare(priority[b], priority[a]); // higher number first
         }
         if (comparison == 0) {
-            comparison = Integer.compare(arrival[a], arrival[b]);
+            comparison = Double.compare(arrival[a], arrival[b]);
         }
         return comparison < 0;
     }
 
     // ------------------------------------------------------------ Round Robin
 
-    private static Result roundRobin(int quantum, int[] arrival, int[] burst) {
+    private static Result roundRobin(double quantum, double[] arrival, double[] burst) {
         int n = arrival.length;
         Result result = new Result(n);
-        int[] remaining = burst.clone();
-        int[] firstStart = new int[n];
+        double[] remaining = burst.clone();
+        double[] firstStart = new double[n];
         java.util.Arrays.fill(firstStart, -1);
         boolean[] queued = new boolean[n];
         java.util.ArrayDeque<Integer> queue = new java.util.ArrayDeque<>();
 
-        int time = 0;
+        double time = 0;
         int finished = 0;
         enqueueArrivals(queue, queued, arrival, time);
         while (finished < n) {
             if (queue.isEmpty()) {
-                addSegment(result, -1, time, time + 1); // idle until the next arrival
-                time++;
+                // Idle until the next arrival.
+                double next = nextArrival(arrival, remaining, time);
+                addSegment(result, -1, time, next);
+                time = next;
                 enqueueArrivals(queue, queued, arrival, time);
                 continue;
             }
@@ -166,13 +192,14 @@ public final class CPUScheduler {
             if (firstStart[current] < 0) {
                 firstStart[current] = time;
             }
-            int slice = Math.min(quantum, remaining[current]);
+            double slice = Math.min(quantum, remaining[current]);
+            boolean completes = slice >= remaining[current];
             addSegment(result, current, time, time + slice);
             time += slice;
-            remaining[current] -= slice;
+            remaining[current] = completes ? 0 : remaining[current] - slice;
             // Newly arrived processes join the queue before the pre-empted one returns to its tail.
             enqueueArrivals(queue, queued, arrival, time);
-            if (remaining[current] > 0) {
+            if (!completes) {
                 queue.add(current);
             } else {
                 result.completion[current] = time;
@@ -184,7 +211,7 @@ public final class CPUScheduler {
     }
 
     private static void enqueueArrivals(java.util.ArrayDeque<Integer> queue, boolean[] queued,
-                                        int[] arrival, int time) {
+                                        double[] arrival, double time) {
         // Selection by arrival time keeps the order stable for processes arriving together.
         while (true) {
             int next = -1;
@@ -203,8 +230,22 @@ public final class CPUScheduler {
 
     // ---------------------------------------------------------------- shared
 
+    /** The earliest arrival time strictly after {@code time} among unfinished processes. */
+    private static double nextArrival(double[] arrival, double[] remaining, double time) {
+        double next = Double.POSITIVE_INFINITY;
+        for (int i = 0; i < arrival.length; i++) {
+            if (remaining[i] > 0 && arrival[i] > time && arrival[i] < next) {
+                next = arrival[i];
+            }
+        }
+        return next;
+    }
+
     /** Appends a segment, merging it with the previous one when it continues the same process. */
-    private static void addSegment(Result result, int process, int start, int end) {
+    private static void addSegment(Result result, int process, double start, double end) {
+        if (end <= start) {
+            return;
+        }
         if (!result.gantt.isEmpty()) {
             Segment last = result.gantt.get(result.gantt.size() - 1);
             if (last.process == process && last.end == start) {
@@ -216,7 +257,7 @@ public final class CPUScheduler {
     }
 
     /** Turnaround = completion - arrival, waiting = turnaround - burst, response = first run - arrival. */
-    private static void fillTimings(Result result, int[] arrival, int[] burst, int[] firstStart) {
+    private static void fillTimings(Result result, double[] arrival, double[] burst, double[] firstStart) {
         for (int i = 0; i < arrival.length; i++) {
             result.turnaround[i] = result.completion[i] - arrival[i];
             result.waiting[i] = result.turnaround[i] - burst[i];

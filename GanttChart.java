@@ -20,10 +20,10 @@ public class GanttChart extends JComponent implements Scrollable {
     /** One block of the chart: CPU time [start, end) used by a process (row index), or -1 for idle. */
     public static final class Segment {
         public final int process;
-        public final int start;
-        public final int end;
+        public final double start;
+        public final double end;
 
-        public Segment(int process, int start, int end) {
+        public Segment(int process, double start, double end) {
             this.process = process;
             this.start = start;
             this.end = end;
@@ -32,7 +32,7 @@ public class GanttChart extends JComponent implements Scrollable {
 
     private final List<Segment> segments = new ArrayList<>();
     private final List<String> names = new ArrayList<>();
-    private int totalTime;
+    private double totalTime;
 
     public GanttChart() {
         setOpaque(false);
@@ -51,7 +51,9 @@ public class GanttChart extends JComponent implements Scrollable {
 
     @Override
     public Dimension getPreferredSize() {
-        return new Dimension(2 * PAD + Math.max(1, totalTime) * MIN_UNIT, BLOCK_HEIGHT + 56);
+        int width = (int) Math.min(Integer.MAX_VALUE,
+                2.0 * PAD + Math.max(1, totalTime) * MIN_UNIT);
+        return new Dimension(width, BLOCK_HEIGHT + 56);
     }
 
     @Override
@@ -67,7 +69,7 @@ public class GanttChart extends JComponent implements Scrollable {
 
         double unit = (getWidth() - 2.0 * PAD) / totalTime;
         int top = 16;
-        int lastTickEnd = Integer.MIN_VALUE;
+        double lastTickEnd = Double.MIN_VALUE;
 
         for (Segment segment : segments) {
             int x = PAD + (int) Math.round(segment.start * unit);
@@ -89,15 +91,19 @@ public class GanttChart extends JComponent implements Scrollable {
 
             // Time marks sit under the left edge of each block; the last block also gets its end mark.
             g2.setColor(UIKit.mutedTextColor());
-            String startLabel = String.valueOf(segment.start);
+            String startLabel = formatTime(segment.start);
             g2.drawString(startLabel, x - metrics.stringWidth(startLabel) / 2, top + BLOCK_HEIGHT + 18);
             lastTickEnd = segment.end;
         }
-        String endLabel = String.valueOf(lastTickEnd);
+        String endLabel = formatTime(lastTickEnd);
         g2.setColor(UIKit.mutedTextColor());
         g2.drawString(endLabel, PAD + (int) Math.round(totalTime * unit) - metrics.stringWidth(endLabel) / 2,
                 top + BLOCK_HEIGHT + 18);
         g2.dispose();
+    }
+
+    private static String formatTime(double time) {
+        return new java.text.DecimalFormat("0.##########").format(time);
     }
 
     // ------------------------------------------------------------ Scrollable

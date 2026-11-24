@@ -1,6 +1,7 @@
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import java.awt.*;
+import java.text.DecimalFormat;
 
 /**
  * Module 7: Disk Scheduling.
@@ -13,6 +14,7 @@ public class DiskSchedulingPanel extends JPanel {
     // Algorithm names shown as option buttons, and the columns of the service-order table.
     private static final String[] ALGORITHMS = {"FCFS", "SSTF", "SCAN", "C-SCAN", "LOOK", "C-LOOK"};
     private static final String[] COLUMNS = {"Step", "From Track", "To Track", "Head Movement"};
+    private final DecimalFormat numberFormat = new DecimalFormat("0.##########");
 
     // Inputs.
     private final JTextField requestField;
@@ -100,21 +102,22 @@ public class DiskSchedulingPanel extends JPanel {
     private void run() {
         Integer diskSize = UIKit.parseInt(diskSizeField, "Disk size", 2, 100000, this);
         if (diskSize == null) return;
-        int[] requests = UIKit.parseIntList(requestField, "Request queue", 0, this);
+        double[] requests = UIKit.parseDoubleList(requestField, "Request queue", 0, this);
         if (requests == null) return;
-        for (int request : requests) {
-            if (request >= diskSize) {
+        for (double request : requests) {
+            if (request > diskSize - 1) {
                 UIKit.markInvalid(requestField, true);
-                UIKit.error(this, "Track " + request + " is outside the disk (0 – " + (diskSize - 1) + ").");
+                UIKit.error(this, "Track " + numberFormat.format(request)
+                        + " is outside the disk (0 – " + (diskSize - 1) + ").");
                 return;
             }
         }
-        Integer head = UIKit.parseInt(headField, "Initial head", 0, diskSize - 1, this);
+        Double head = UIKit.parseDouble(headField, "Initial head", 0, diskSize - 1, this);
         if (head == null) return;
 
         String algorithm = selectedAlgorithm();
         boolean towardHigher = directionBox.getSelectedIndex() == 0;
-        int[] order = computeServiceOrder(algorithm, head, requests, diskSize, towardHigher);
+        double[] order = computeServiceOrder(algorithm, head, requests, diskSize, towardHigher);
         if (order == null) {
             chartSection.setHint(algorithm + " is not implemented yet");
             return;
@@ -127,26 +130,26 @@ public class DiskSchedulingPanel extends JPanel {
      * Hook for the scheduling algorithms. Return the visited tracks in order, starting
      * with the initial head position, or null when the algorithm is not implemented.
      */
-    protected int[] computeServiceOrder(String algorithm, int head, int[] requests, int diskSize,
-                                        boolean towardHigher) {
+    protected double[] computeServiceOrder(String algorithm, double head, double[] requests, int diskSize,
+                                           boolean towardHigher) {
         if ("FCFS".equals(algorithm)) {
-            int[] order = new int[requests.length + 1];
+            double[] order = new double[requests.length + 1];
             order[0] = head;
             System.arraycopy(requests, 0, order, 1, requests.length);
             return order;
         }
 
         if ("SSTF".equals(algorithm)) {
-            java.util.ArrayList<Integer> remaining = new java.util.ArrayList<>();
-            for (int request : requests) remaining.add(request);
-            java.util.ArrayList<Integer> order = new java.util.ArrayList<>();
+            java.util.ArrayList<Double> remaining = new java.util.ArrayList<>();
+            for (double request : requests) remaining.add(request);
+            java.util.ArrayList<Double> order = new java.util.ArrayList<>();
             order.add(head);
-            int current = head;
+            double current = head;
             while (!remaining.isEmpty()) {
                 int closestIndex = 0;
                 for (int i = 1; i < remaining.size(); i++) {
-                    int candidateDistance = Math.abs(remaining.get(i) - current);
-                    int closestDistance = Math.abs(remaining.get(closestIndex) - current);
+                    double candidateDistance = Math.abs(remaining.get(i) - current);
+                    double closestDistance = Math.abs(remaining.get(closestIndex) - current);
                     if (candidateDistance < closestDistance) {
                         closestIndex = i;
                     }
@@ -154,36 +157,36 @@ public class DiskSchedulingPanel extends JPanel {
                 current = remaining.remove(closestIndex);
                 order.add(current);
             }
-            int[] result = new int[order.size()];
+            double[] result = new double[order.size()];
             for (int i = 0; i < order.size(); i++) result[i] = order.get(i);
             return result;
         }
 
-        java.util.ArrayList<Integer> lower = new java.util.ArrayList<>();
-        java.util.ArrayList<Integer> higher = new java.util.ArrayList<>();
-        for (int request : requests) {
+        java.util.ArrayList<Double> lower = new java.util.ArrayList<>();
+        java.util.ArrayList<Double> higher = new java.util.ArrayList<>();
+        for (double request : requests) {
             if (request < head) lower.add(request);
             else if (request > head) higher.add(request);
         }
         java.util.Collections.sort(lower);
         java.util.Collections.sort(higher);
 
-        java.util.ArrayList<Integer> order = new java.util.ArrayList<>();
+        java.util.ArrayList<Double> order = new java.util.ArrayList<>();
         order.add(head);
 
         if ("LOOK".equals(algorithm)) {
             if (towardHigher) {
-                for (int request : higher) order.add(request);
+                for (double request : higher) order.add(request);
                 for (int i = lower.size() - 1; i >= 0; i--) order.add(lower.get(i));
             } else {
                 for (int i = lower.size() - 1; i >= 0; i--) order.add(lower.get(i));
-                for (int request : higher) order.add(request);
+                for (double request : higher) order.add(request);
             }
         } else if ("C-LOOK".equals(algorithm)) {
             if (towardHigher) {
-                for (int request : higher) order.add(request);
+                for (double request : higher) order.add(request);
                 if (!lower.isEmpty()) {
-                    for (int request : lower) order.add(request);
+                    for (double request : lower) order.add(request);
                 }
             } else {
                 for (int i = lower.size() - 1; i >= 0; i--) order.add(lower.get(i));
@@ -193,20 +196,20 @@ public class DiskSchedulingPanel extends JPanel {
             }
         } else if ("SCAN".equals(algorithm)) {
             if (towardHigher) {
-                for (int request : higher) order.add(request);
+                for (double request : higher) order.add(request);
                 addTrack(order, diskSize - 1);
                 for (int i = lower.size() - 1; i >= 0; i--) order.add(lower.get(i));
             } else {
                 for (int i = lower.size() - 1; i >= 0; i--) order.add(lower.get(i));
                 addTrack(order, 0);
-                for (int request : higher) order.add(request);
+                for (double request : higher) order.add(request);
             }
         } else if ("C-SCAN".equals(algorithm)) {
             if (towardHigher) {
-                for (int request : higher) order.add(request);
+                for (double request : higher) order.add(request);
                 addTrack(order, diskSize - 1);
                 addTrack(order, 0);
-                for (int request : lower) order.add(request);
+                for (double request : lower) order.add(request);
             } else {
                 for (int i = lower.size() - 1; i >= 0; i--) order.add(lower.get(i));
                 addTrack(order, 0);
@@ -217,30 +220,49 @@ public class DiskSchedulingPanel extends JPanel {
             return null;
         }
 
-        int[] result = new int[order.size()];
+        double[] result = new double[order.size()];
         for (int i = 0; i < order.size(); i++) result[i] = order.get(i);
         return result;
     }
 
-    private static void addTrack(java.util.ArrayList<Integer> order, int track) {
-        if (order.isEmpty() || order.get(order.size() - 1) != track) {
+    private static void addTrack(java.util.ArrayList<Double> order, double track) {
+        if (order.isEmpty() || Double.compare(order.get(order.size() - 1), track) != 0) {
             order.add(track);
         }
     }
 
+    /** Compatibility overload for whole-number requests and head positions. */
+    protected int[] computeServiceOrder(String algorithm, int head, int[] requests, int diskSize,
+                                        boolean towardHigher) {
+        double[] decimalRequests = new double[requests.length];
+        for (int i = 0; i < requests.length; i++) decimalRequests[i] = requests[i];
+        double[] decimalOrder = computeServiceOrder(algorithm, head, decimalRequests, diskSize, towardHigher);
+        if (decimalOrder == null) return null;
+        int[] order = new int[decimalOrder.length];
+        for (int i = 0; i < decimalOrder.length; i++) order[i] = (int) decimalOrder[i];
+        return order;
+    }
+
     /** Fills the table with every seek, updates the totals and redraws the chart. */
-    public void showResult(int[] order, int diskSize, boolean animate) {
+    public void showResult(double[] order, int diskSize, boolean animate) {
         tableModel.setRowCount(0);
-        long total = 0;
+        double total = 0;
         for (int i = 1; i < order.length; i++) {
-            int distance = Math.abs(order[i] - order[i - 1]);
+            double distance = Math.abs(order[i] - order[i - 1]);
             total += distance;
-            tableModel.addRow(new Object[]{String.valueOf(i), String.valueOf(order[i - 1]),
-                    String.valueOf(order[i]), String.valueOf(distance)});
+            tableModel.addRow(new Object[]{String.valueOf(i), numberFormat.format(order[i - 1]),
+                    numberFormat.format(order[i]), numberFormat.format(distance)});
         }
         int moves = Math.max(1, order.length - 1);
-        totalStat.setValue(String.valueOf(total));
-        averageStat.setValue(String.format("%.2f", (double) total / moves));
+        totalStat.setValue(numberFormat.format(total));
+        averageStat.setValue(numberFormat.format(total / moves));
         chart.setSequence(order, diskSize - 1, animate);
+    }
+
+    /** Compatibility overload for whole-number track positions. */
+    public void showResult(int[] order, int diskSize, boolean animate) {
+        double[] decimalOrder = new double[order.length];
+        for (int i = 0; i < order.length; i++) decimalOrder[i] = order[i];
+        showResult(decimalOrder, diskSize, animate);
     }
 }

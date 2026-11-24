@@ -342,9 +342,40 @@ public final class UIKit {
         return true;
     }
 
+    /** Validates that every cell from {@code fromColumn} onward is a finite non-negative number. */
+    public static boolean validateDecimalTable(JTable table, int fromColumn, int toColumn,
+                                               String tableName, Component parent) {
+        stopEditing(table);
+        DefaultTableModel model = (DefaultTableModel) table.getModel();
+        for (int row = 0; row < model.getRowCount(); row++) {
+            for (int column = fromColumn; column < toColumn; column++) {
+                Object value = model.getValueAt(row, column);
+                String text = value == null ? "" : value.toString().trim();
+                try {
+                    double number = Double.parseDouble(text);
+                    if (Double.isNaN(number) || Double.isInfinite(number) || number < 0) {
+                        throw new NumberFormatException();
+                    }
+                } catch (NumberFormatException e) {
+                    table.changeSelection(row, column, false, false);
+                    table.requestFocusInWindow();
+                    error(parent, tableName + ": row " + (row + 1) + ", \"" + model.getColumnName(column)
+                            + "\" must be a finite number (0 or more).");
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+
     /** Reads a cell as an int. Call validateNumericTable first. */
     public static int intAt(DefaultTableModel model, int row, int column) {
         return Integer.parseInt(model.getValueAt(row, column).toString().trim());
+    }
+
+    /** Reads a cell as a double. Call validateDecimalTable first. */
+    public static double doubleAt(DefaultTableModel model, int row, int column) {
+        return Double.parseDouble(model.getValueAt(row, column).toString().trim());
     }
 
     // ------------------------------------------------------------ validation
@@ -360,6 +391,20 @@ public final class UIKit {
             return value;
         } catch (NumberFormatException e) {
             return reject(field, parent, name + " must be a whole number between " + min + " and " + max + ".");
+        }
+    }
+
+    /** Parses a finite decimal value within [min, max]. Shows an error and returns null when invalid. */
+    public static Double parseDouble(JTextField field, String name, double min, double max, Component parent) {
+        try {
+            double value = Double.parseDouble(field.getText().trim());
+            if (Double.isNaN(value) || Double.isInfinite(value) || value < min || value > max) {
+                throw new NumberFormatException();
+            }
+            markInvalid(field, false);
+            return value;
+        } catch (NumberFormatException e) {
+            return reject(field, parent, name + " must be a finite number between " + min + " and " + max + ".");
         }
     }
 
@@ -380,6 +425,44 @@ public final class UIKit {
             }
         } catch (NumberFormatException e) {
             return reject(field, parent, name + " must be a comma-separated list of whole numbers (" + min + " or more).");
+        }
+        markInvalid(field, false);
+        return values;
+    }
+
+    /** Parses a comma/space-separated list of finite decimal values (each at least {@code min}). */
+    public static double[] parseDoubleList(JTextField field, String name, double min, Component parent) {
+        String text = field.getText().trim();
+        if (text.isEmpty()) {
+            return reject(field, parent, name + " cannot be empty.");
+        }
+        String[] parts = text.split("[,\\s]+");
+        double[] values = new double[parts.length];
+        try {
+            for (int i = 0; i < parts.length; i++) {
+                values[i] = Double.parseDouble(parts[i]);
+                if (Double.isNaN(values[i]) || Double.isInfinite(values[i]) || values[i] < min) {
+                    throw new NumberFormatException();
+                }
+            }
+        } catch (NumberFormatException e) {
+            return reject(field, parent, name + " must be a list of finite numbers (" + min + " or more).");
+        }
+        markInvalid(field, false);
+        return values;
+    }
+
+    /** Parses a comma- or whitespace-separated list of non-empty string values. */
+    public static String[] parseStringList(JTextField field, String name, Component parent) {
+        String text = field.getText().trim();
+        if (text.isEmpty()) {
+            return reject(field, parent, name + " cannot be empty.");
+        }
+        String[] values = text.split("[,\\s]+");
+        for (String value : values) {
+            if (value.isEmpty()) {
+                return reject(field, parent, name + " must contain non-empty values.");
+            }
         }
         markInvalid(field, false);
         return values;
